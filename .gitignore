@@ -1,0 +1,15 @@
+# User-generated office data — git pull must never collide with it
+office/
+
+# Pristine source copies used during the build; not part of the shipped repo
+_source/
+
+node_modules/
+ui/dist/
+tests/.fixture/
+*.backup-*
+.DS_Store
+
+# The user's own office shape — created by setup from the example
+office.config.json
+test-results/

@@ -1,0 +1,30 @@
+{
+  "name": "command-centre",
+  "version": "0.1.0",
+  "description": "Command Centre — a 3D isometric office for your own Claude Code agents",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "office": "bin/office"
+  },
+  "scripts": {
+    "build:ui": "cd ui && node build.mjs",
+    "test": "playwright test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "yaml": "^2.5.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0",
+    "esbuild": "^0.28.1",
+    "three": "^0.185.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

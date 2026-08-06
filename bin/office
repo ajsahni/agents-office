@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+import { writeFileSync, rmSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { loadConfig } from '../daemon/config.js';
+import { listAgents, loadManifest } from '../daemon/manifest.js';
+import { readStatus } from '../daemon/events.js';
+import { runAgent } from '../daemon/runner.js';
+import { startScheduler } from '../daemon/scheduler.js';
+
+const cfg = loadConfig();
+const [cmd, ...rest] = process.argv.slice(2);
+
+const usage = `office — Command Centre CLI
+
+  office start                start the office (UI server + scheduler; leave it running)
+  office status               show every agent's status
+  office run <agent> [task]   run an agent now (optional task text overrides inbox check)
+  office chat <agent> <msg>   message an agent and stream its reply
+  office approve <id> [note]  approve a queued outbound request
+  office reject <id> [note]   reject it (notes go back to the agent)
+  office new-agent            hire a new agent (interactive wizard; KEY=VALUE answers for scripts)
+  office pause | resume       freeze / unfreeze all scheduling
+`;
+
+switch (cmd) {
+  case 'start':
+  case 'serve': {
+    const { startServer } = await import('../daemon/server.js');
+    const { decideApproval } = await import('../daemon/approvals.js');
+    startServer(cfg, { decideApproval: (id, body) => decideApproval(cfg, id, body) });
+    if (process.env.OFFICE_NO_SCHED !== '1') startScheduler(cfg); // tests serve the UI without firing real cron runs
+    break;
+  }
+  case 'status': {
+    const agents = listAgents(cfg);
+    if (!agents.length) { console.log('No agents hired yet — hire one with: office new-agent'); break; }
+    for (const a of agents) {
+      const m = loadManifest(cfg, a);
+      const s = readStatus(cfg, a);
+      const last = s.last_run ? `${s.last_run.ok ? '✅' : '🔴'} ${s.last_run.started}` : '—';
+      const t = s.totals ?? {};
+      console.log(`${statusIcon(s.status)} ${m.display_name.padEnd(12)} ${m.session.model}/${m.session.effort}  last: ${last}  today: ${t.runs_today ?? 0} runs, ${((t.tokens_today ?? 0) / 1000).toFixed(1)}k tok, ~$${(t.cost_today ?? 0).toFixed(2)}`);
+    }
+    if (existsSync(cfg.pauseFlag)) console.log('\n⏸  OFFICE PAUSED — office resume to continue');
+    break;
+  }
+  case 'run': {
+    const [agent, ...task] = rest;
+    if (!agent) { console.error('Usage: office run <agent> [task text]'); process.exit(1); }
+    console.log(`▶ Running ${agent}…`);
+    const record = await runAgent(cfg, agent, { trigger: 'manual', prompt: task.length ? task.join(' ') : undefined, echo: true });
+    if (record.skipped) { console.log('\n📭 Nothing to do (empty inbox) — no session started.'); process.exit(0); }
+    console.log(record.is_error ? `\n🔴 Run failed.` : `\n🏁 Done — session ${record.session_id}, ${record.num_turns} turns, $${record.total_cost_usd?.toFixed(4)} est. API value.`);
+    process.exit(record.is_error ? 1 : 0);
+    break;
+  }
+  case 'chat': {
+    const [agent, ...words] = rest;
+    if (!agent || !words.length) { console.error('Usage: office chat <agent> <message>'); process.exit(1); }
+    const { agentStateDir } = await import('../daemon/events.js');
+    const ev = join(agentStateDir(cfg, agent), 'events.jsonl');
+    const before = existsSync(ev) ? readFileSync(ev, 'utf8').split('\n').filter(Boolean).length : 0;
+    let sent = false;
+    try {
+      const resp = await fetch(`http://localhost:${cfg.port}/api/agents/${agent}/chat`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: words.join(' ') }),
+      });
+      sent = (await resp.json()).ok;
+    } catch { /* daemon not running — go direct */ }
+    if (!sent) {
+      const { chatWith } = await import('../daemon/runner.js');
+      await chatWith(cfg, agent, words.join(' '));
+    }
+    const deadline = Date.now() + 8 * 60_000;
+    let shown = before;
+    while (Date.now() < deadline) {
+      await new Promise((res) => setTimeout(res, 2000));
+      const lines = existsSync(ev) ? readFileSync(ev, 'utf8').split('\n').filter(Boolean) : [];
+      for (; shown < lines.length; shown++) {
+        const e = JSON.parse(lines[shown]);
+        console.log(`  ${e.icon ?? '·'} ${e.type.padEnd(9)} ${(e.text ?? '').split('\n')[0]}`);
+        if (e.type === 'run_end') process.exit(0);
+      }
+    }
+    console.error('Timed out waiting for a reply.');
+    process.exit(1);
+  }
+  case 'approve':
+  case 'reject': {
+    const [id, ...noteWords] = rest;
+    if (!id) { console.error(`Usage: office ${cmd} <approval-id> [notes]`); process.exit(1); }
+    const { decideApproval, findApproval } = await import('../daemon/approvals.js');
+    const found = findApproval(cfg, id);
+    if (!found) { console.error(`No approval ${id}`); process.exit(1); }
+    const { agentStateDir } = await import('../daemon/events.js');
+    const ev = join(agentStateDir(cfg, found.agent), 'events.jsonl');
+    const before = existsSync(ev) ? readFileSync(ev, 'utf8').split('\n').length : 0;
+    // Route through the daemon when it's up — approvals must land in the process
+    // that may hold the agent's live session.
+    let r;
+    try {
+      const resp = await fetch(`http://localhost:${cfg.port}/api/approvals/${id}/decision`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: cmd, notes: noteWords.join(' ') || undefined }),
+      });
+      r = await resp.json();
+    } catch {
+      r = await decideApproval(cfg, id, { decision: cmd, notes: noteWords.join(' ') || undefined });
+    }
+    if (!r.ok) { console.error(r.error); process.exit(1); }
+    console.log(`${cmd === 'approve' ? '✅ approved' : '✗ rejected'} ${id} — waiting for ${found.agent} to react…`);
+    const deadline = Date.now() + 8 * 60_000;
+    let lastShown = before;
+    while (Date.now() < deadline) {
+      await new Promise((res) => setTimeout(res, 2000));
+      const lines = readFileSync(ev, 'utf8').split('\n').filter(Boolean);
+      for (; lastShown < lines.length; lastShown++) {
+        const e = JSON.parse(lines[lastShown]);
+        console.log(`  ${e.icon ?? '·'} ${e.type.padEnd(9)} ${(e.text ?? '').split('\n')[0]}`);
+        if (e.type === 'run_end') { process.exit(0); }
+      }
+    }
+    console.error('Timed out waiting for the agent.');
+    process.exit(1);
+  }
+  case 'new-agent': {
+    const answers = {};
+    for (const a of rest) {
+      const m = a.match(/^([A-Z_]+)=([\s\S]*)$/);
+      if (m) answers[m[1]] = m[2];
+    }
+    const { newAgent } = await import('../daemon/wizard.js');
+    try { await newAgent(cfg, { answers }); }
+    catch (err) { console.error(`✗ ${err.message}`); process.exit(1); }
+    break;
+  }
+  case 'pause': {
+    mkdirSync(dirname(cfg.pauseFlag), { recursive: true });
+    writeFileSync(cfg.pauseFlag, new Date().toISOString());
+    console.log('⏸  Office paused. office resume to continue.');
+    break;
+  }
+  case 'resume': {
+    rmSync(cfg.pauseFlag, { force: true });
+    console.log('▶️  Office resumed.');
+    break;
+  }
+  default:
+    console.log(usage);
+    process.exit(cmd ? 1 : 0);
+}
+
+function statusIcon(s) {
+  return { running: '⌨️', idle: '💤', error: '🔴', stuck: '⚠️' }[s] ?? '·';
+}
