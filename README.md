@@ -1,6 +1,6 @@
 # Command Centre
 
-![Command Centre — a 3D isometric office for your Claude Code agents](evidence/m6-final-6dept-mid.png)
+![Command Centre — a 3D isometric office for your Claude Code agents](evidence/readme-hero.png)
 
 A 3D isometric office for your own Claude Code agents. Departments are floating
 pods, your agents are little people at desks, and everything on screen is real:
