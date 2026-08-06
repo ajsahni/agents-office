@@ -100,10 +100,6 @@ Open **http://localhost:4477**. Then:
   token/est-cost readout for today.
 - **CLI** — `bin/office status | run <agent> | chat <agent> <msg> | approve <id> | pause | resume`
 
-**Hotkeys** — `1–6` fly to departments · click an agent for chat · `C` chat with
-the focused department's lead · `Esc` back · `+`/`−`/`0` zoom · double-click
-empty space for overview.
-
 ## Schedules
 
 Each agent's `manifest.yaml` carries its triggers:
