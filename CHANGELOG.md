@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0-beta.3 — 6 Sep 2026
+
+- No more "demo" label: the panel shows LIVE · CLAUDE when the server is connected and nothing otherwise.
+
 ## 3.0.0-beta.2 — 6 Sep 2026
 
 - The Brain strip is gone from the task panel. Open the Brain with G, by clicking the pod, or by its tag.

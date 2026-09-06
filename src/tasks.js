@@ -306,7 +306,7 @@ export function initTasks(ctx) {
         say(`Added — <b>${agentOf(t.agent).name}</b> has it${st.why ? ' · ' + esc(st.why) : ''}`);
         setTimeout(() => { if (!P_.input.value) P_.hint.classList.remove('on'); }, 7000);
       } catch (e) {
-        say(`Claude couldn't take it (${esc(e.message)}). Kept it in the demo instead.`, 'err');
+        say(`Claude couldn't take it (${esc(e.message)}). Kept it on the board.`, 'err');
         const { agent: a } = route(k, text); addTask(a.id, text, 'you');
       }
       P_.input.disabled = false; P_.add.disabled = false; P_.input.blur(); // hand the keys back to the office
@@ -344,7 +344,7 @@ export function initTasks(ctx) {
       if (!h.ok) return;
       live = true;
       const mode = panel.querySelector('.tp-mode');
-      if (mode) { mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${h.model} · brain: ${h.brain}`; }
+      if (mode) { mode.hidden = false; mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${h.model} · brain: ${h.brain}`; }
       if (brain) { try { brain.setGraph(await (await fetch(API + '/brain')).json()); } catch {} }
       const list = await (await fetch(API + '/tasks')).json();
       for (const st of list) {
@@ -359,7 +359,7 @@ export function initTasks(ctx) {
       }
       dirty = true;
       if (onLive) onLive(h);
-    } catch (e) { console.warn('office server not reachable — demo mode:', e.message); }
+    } catch (e) { console.warn('office server not reachable — running offline:', e.message); }
   }
   connect();
   function addTask(agentId, title, by = 'you') {

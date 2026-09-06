@@ -35,7 +35,7 @@ Without `./setup`: `npm install && node build.mjs && npm start`.
 ## First five minutes
 
 1. Open http://localhost:4520. The panel on the right says **LIVE · CLAUDE** when the server is
-   connected. Opened as a plain file it runs a demo instead.
+   connected. Opened as a plain file it runs on its own without a server.
 2. In the bar at the top of the panel, pick a department, type a task in plain words, press **Add**.
    Claude picks the agent and names them; the task appears in the feed; the agent picks it up,
    works, and the deliverable lands in that agent's chat and in your brain folder as a note.
