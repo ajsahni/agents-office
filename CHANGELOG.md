@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.0-beta.2 — 6 Sep 2026
+## 3.0.0-beta.1 — 6 Sep 2026
 
-The Beta: the V3 office as a real, installable app.
+Agents Office v3 (Beta): the V3 office as a real, installable app.
 
 - Six departments, 33 agents, each with a role, a voice and a task pool.
 - Task Status panel with a command bar: type a task, pick the department, the office routes it to the right agent through Claude and the agent produces the deliverable, saved as a note in your brain folder.

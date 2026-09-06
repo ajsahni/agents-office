@@ -1,4 +1,4 @@
-# Agents Office (Beta)
+# Agents Office v3 (Beta)
 
 ![Agents Office — six department pods around the Brain, with the Task Status panel](assets/readme-hero.jpg)
 
