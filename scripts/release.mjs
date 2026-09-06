@@ -69,7 +69,7 @@ const zip = path.join(TMP, `agents-office-${TAG}.zip`);
 run('zip', ['-qr', zip, '.', '-x', '.git/*'], { cwd: pub });
 const notes = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8').split('\n## ')[1] || TAG;
 const rel = spawnSync('gh', ['release', 'view', TAG, '-R', 'ajsahni/agents-office'], { encoding: 'utf8' });
-if (rel.status === 0) run('gh', ['release', 'upload', TAG, zip, '--clobber', '-R', 'ajsahni/agents-office']);
+if (rel.status === 0) console.log(`  release ${TAG} already exists and is immutable — bump package.json to ship a new zip`);
 else run('gh', ['release', 'create', TAG, zip, '--prerelease', '--title', `Agents Office ${TAG}`, '--notes', '## ' + notes, '--target', BRANCH, '-R', 'ajsahni/agents-office']);
 if (rel.status === 0) spawnSync('gh', ['release', 'edit', TAG, '--target', BRANCH, '-R', 'ajsahni/agents-office']);
 console.log(`✓ Published ${BRANCH} @ ${TAG} → https://github.com/ajsahni/agents-office/tree/${BRANCH}  ·  https://github.com/ajsahni/agents-office/releases/tag/${TAG}`);

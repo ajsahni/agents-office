@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0-beta.2 — 6 Sep 2026
+
+- The Brain strip is gone from the task panel. Open the Brain with G, by clicking the pod, or by its tag.
+
 ## 3.0.0-beta.1 — 6 Sep 2026
 
 Agents Office v3 (Beta): the V3 office as a real, installable app.
