@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-beta.1 — 6 Sep 2026
+## 0.2.0-beta.2 — 6 Sep 2026
 
 The Beta: the V3 office as a real, installable app.
 

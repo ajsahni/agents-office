@@ -1,7 +1,7 @@
 {
   "name": "agents-office",
-  "version": "0.2.0-beta.1",
-  "description": "Agents Office — a 3D isometric office where AI agents do real work on your own Claude login",
+  "version": "0.2.0-beta.2",
+  "description": "Agents Office \u2014 a 3D isometric office where AI agents do real work on your own Claude login",
   "type": "module",
   "private": true,
   "scripts": {
@@ -11,7 +11,9 @@
     "check:live": "CHECK_LIVE=1 node check.mjs",
     "graph": "node graph-build.mjs"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "d3-force": "^3.0.0"
   },

@@ -1,7 +1,7 @@
 // Agents Office — cut a clean public release from this working copy.
 //
 //   node scripts/release.mjs                 → assembles dist/release/ (inspect it)
-//   node scripts/release.mjs --push          → … and pushes branch `beta` + tag to the public repo,
+//   node scripts/release.mjs --push          → … and pushes `main` + a new tag to the public repo,
 //                                              then creates a GitHub pre-release with a zip
 //
 // The working copy is the private source of truth (NOTES.md, shots, the vault-backed local config).
@@ -55,13 +55,15 @@ run('git', hasBranch ? ['checkout', '-q', BRANCH] : ['checkout', '-q', '-b', BRA
 for (const ent of fs.readdirSync(pub)) if (ent !== '.git') fs.rmSync(path.join(pub, ent), { recursive: true, force: true });
 fs.cpSync(OUT, pub, { recursive: true });
 run('git', ['add', '-A'], { cwd: pub });
-if (spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: pub }).status === 0) { console.log('✓ Public branch already matches — nothing to publish.'); process.exit(0); }
-run('git', ['commit', '-q', '-m', `Agents Office ${TAG}`], { cwd: pub });
-run('git', ['tag', '-f', TAG, '-m', TAG], { cwd: pub });
-console.log('→ pushing', BRANCH, TAG);
+if (spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: pub }).status === 0) console.log('  public branch already matches — tagging the current commit');
+else run('git', ['commit', '-q', '-m', `Agents Office ${TAG}`], { cwd: pub });
+// tags are never force-moved (the repo's rules refuse it): bump package.json to cut a new one
+const tagged = spawnSync('git', ['ls-remote', '--tags', 'origin', TAG], { cwd: pub, encoding: 'utf8' }).stdout.trim() !== '';
+if (!tagged) run('git', ['tag', TAG, '-m', TAG], { cwd: pub });
+console.log('→ pushing', BRANCH, tagged ? `(${TAG} already exists)` : TAG);
 run('git', ['push', '-q', '-u', 'origin', BRANCH], { cwd: pub });
 if (BRANCH === 'main') spawnSync('git', ['push', '-q', 'origin', '--delete', 'beta'], { cwd: pub }); // the beta branch folds into main
-run('git', ['push', '-q', '-f', 'origin', TAG], { cwd: pub });
+if (!tagged) run('git', ['push', '-q', 'origin', TAG], { cwd: pub });
 console.log('→ zip + GitHub pre-release');
 const zip = path.join(TMP, `agents-office-${TAG}.zip`);
 run('zip', ['-qr', zip, '.', '-x', '.git/*'], { cwd: pub });
