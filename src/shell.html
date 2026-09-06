@@ -728,6 +728,41 @@
   }
   #brainOv.on #bvClose { display: none; } /* Esc and the pod both close; the brand stays clean */
 
+
+  /* ---------- DARK MODE (6 Sep 2026) — tokens first, then the surfaces that were hard-coded white ---------- */
+  body.dark {
+    --cream: #15161A; --ink: #ECEAE3; --grey: #A3A098; --hairline: rgba(236,234,227,.14);
+    background: radial-gradient(120% 90% at 50% 30%, #1B1C20 45%, #0F1013 100%);
+    color: var(--ink);
+  }
+  body.dark.cam { background: radial-gradient(120% 90% at 50% 30%, #2A2B30 45%, #151619 100%); }
+  body.dark #topbar { background: color-mix(in srgb, var(--cream) 90%, transparent); }
+  body.dark .badge, body.dark .pill, body.dark .connl, body.dark .mcp-tip, body.dark #railHeader, body.dark #board, body.dark #tpanel,
+  body.dark .tp-cmd, body.dark .tp-menu, body.dark .tk, body.dark .tp-row, body.dark .m-agent, body.dark .m-file, body.dark #mStats .st,
+  body.dark #rail .mInput input, body.dark .mk, body.dark #railAgent, body.dark .tp-brain, body.dark .readlab { background: #1E1F24; color: var(--ink); }
+  body.dark .badge, body.dark .pill, body.dark .connl, body.dark .tk, body.dark .tp-row, body.dark .m-agent, body.dark .m-file, body.dark #mStats .st, body.dark .mk, body.dark .tp-cmd { border-color: var(--hairline); }
+  body.dark #rail { background: color-mix(in srgb, #15161A 82%, transparent); }
+  body.dark #rail.left { box-shadow: 30px 0 80px rgba(0,0,0,.45); }
+  body.dark #boardDim { background: rgba(15,16,19,.72); }
+  body.dark .tp-in, body.dark .tp-menu button { color: var(--ink); }
+  body.dark .tp-menu button:hover { background: rgba(236,234,227,.08); }
+  body.dark .tp-add, body.dark #rail .mInput button, body.dark #overviewBtn, body.dark .m-user, body.dark .mk-ad .ad-cta, body.dark .m-appr .a-yes { background: var(--ink); color: #15161A; border-color: var(--ink); }
+  body.dark .tp-chip.on { background: var(--ink); color: #15161A; border-color: var(--ink); }
+  body.dark .tp-chip.on b { color: #15161A; }
+  body.dark .tp-bar, body.dark .tk-bar { background: rgba(236,234,227,.12); }
+  body.dark .tp-bar i, body.dark .tk-bar i { background: var(--ink); }
+  body.dark .tp-row.waiting, body.dark .tk.waiting, body.dark .m-appr { background: rgba(242,184,75,.12); }
+  body.dark .badge.sweepglow { box-shadow: 0 0 0 1.5px var(--sw), 0 14px 44px -8px var(--sw), 0 12px 30px rgba(0,0,0,.4); }
+  body.dark .m-file pre { background: #0F1013; }
+  body.dark #zoomCtl button { background: #1E1F24; color: var(--ink); border-color: var(--hairline); }
+  body.dark #zoomCtl button:hover { background: var(--ink); color: #15161A; }
+  body.dark .mk-doc .d-line { border-bottom-color: rgba(236,234,227,.12); }
+  body.dark .mk-mail .ml-body { color: rgba(236,234,227,.75); }
+  body.dark .mk-ad .ad-media { color: var(--ink); }
+  body.dark .mk-table .t-total { background: rgba(236,234,227,.06); }
+  body.dark #wires path, body.dark #wires circle { filter: brightness(1.15); }
+  body.dark #vignette { background: radial-gradient(ellipse at 50% 45%, transparent 32%, rgba(0,0,0,.6) 100%); }
+
   /* dept floor titles — screen-space, always horizontal (camera-readability rule) */
   .floorlabel {
     position: absolute; left: 0; top: 0;

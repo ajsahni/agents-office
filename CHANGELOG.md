@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0-beta.4 — 6 Sep 2026
+
+- Dark mode: press D, add `#dark=1`, open `command-centre-v2-dark.html`, or visit http://localhost:4520/dark. The scene relights, pods and walkways re-tint, the Brain and wires swap ink.
+
 ## 3.0.0-beta.3 — 6 Sep 2026
 
 - No more "demo" label: the panel shows LIVE · CLAUDE when the server is connected and nothing otherwise.

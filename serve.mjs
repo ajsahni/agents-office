@@ -23,6 +23,7 @@ import { V1 } from './src/v1data.js';
 
 const cfg = loadConfig();
 const HTML = path.join(ROOT, 'command-centre-v2.html');
+const HTML_DARK = path.join(ROOT, 'command-centre-v2-dark.html');
 const DATA = path.join(ROOT, 'data');
 const FILE = path.join(DATA, 'tasks.json');
 const BRAIN = cfg.brainPath;
@@ -173,9 +174,9 @@ await rebuildGraph();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/command-centre-v2.html')) {
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/command-centre-v2.html' || url.pathname === '/dark')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      return res.end(fs.readFileSync(HTML));
+      return res.end(fs.readFileSync(url.pathname === '/dark' && fs.existsSync(HTML_DARK) ? HTML_DARK : HTML));
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, version, backend, model: cfg.model || (sdk ? 'claude-opus-5' : 'your Claude Code default'), name: cfg.name, brain: BRAIN, notes: graph.notes, depts: DEPT_KEYS });
     if (url.pathname === '/api/brain') return json(res, 200, graph);

@@ -92,7 +92,8 @@ function tickTween(now) {
 }
 
 /* ---------- lights: one warm key top-left + soft fill ---------- */
-scene.add(new THREE.HemisphereLight(0xfdfff8, 0xd8d4c8, 0.85));
+const hemi = new THREE.HemisphereLight(0xfdfff8, 0xd8d4c8, 0.85);
+scene.add(hemi);
 const key = new THREE.DirectionalLight(0xfff1dd, 2.2);
 key.position.set(-60, 90, 20);
 key.castShadow = true;
@@ -129,6 +130,7 @@ for (const [key_, L] of Object.entries(LAYOUT)) {
   const plinth = makePlinth(L.w, L.d, dept.floor);
   g.add(plinth);
   plinth.traverse(o => { if (o.isMesh) { o.userData.dept = key_; clickTargets.push(o); } });
+  plinth.children[0].userData.part = 'plinth'; plinth.children[1].userData.part = 'floor'; plinth.children[1].userData.chip = dept.chip; // dark mode re-tints these
 
   // no floor titles — the billboards name each department (AJ's call, M2.3)
   scene.add(g);
@@ -180,7 +182,7 @@ for (const k of DEPT_KEYS) {
   const from = [L.pos[0] - sx * (L.w / 2 - 1), L.pos[1] - sz * (L.d / 2 - 1)];
   const to = [sx * 6.5, sz * 6.5];
   const walk = makeWalkway(from, to);
-  walk.userData.dept = k;
+  walk.userData.dept = k; walk.userData.part = 'walkway';
   scene.add(walk);
   deptRT[k].gate = new THREE.Vector3(from[0], 0, from[1]);
   deptRT[k].brainGate = new THREE.Vector3(to[0], 0, to[1]);
@@ -491,11 +493,36 @@ addEventListener('keydown', (e) => {
     }
   }
   else if (e.key === 'v' || e.key === 'V') setCam(!document.body.classList.contains('cam'));
+  else if (e.key === 'd' || e.key === 'D') setDark(!darkOn);
   else if (e.key === 'w' || e.key === 'W') requestApproval('apay'); // demo cue: Accounts Payable asks for approval
 });
 
 // camera mode: mid-tone backdrop for filming the screen (#cam=1 / V toggles)
 function setCam(on) { document.body.classList.toggle('cam', !!on); }
+// DARK MODE (AJ, 6 Sep 2026: "make another one in dark mode as I will show both"): D toggles, #dark=1
+// forces it, command-centre-v2-dark.html opens in it. The chrome follows the CSS tokens; the scene
+// re-tints its shared materials (plinths, floors, walkways), relights, and the Brain/wires swap ink.
+let darkOn = false;
+const DARK = { plinth: 0x2c2d2b, walkway: 0x303230, ground: 0x1b1c1a };
+function mix(hex, base, k) { const a = new THREE.Color(hex), b = new THREE.Color(base); return b.lerp(a, k); }
+function setDark(on) {
+  darkOn = !!on;
+  document.body.classList.toggle('dark', darkOn);
+  restoreSceneDim(); dimCache.clear(); // the dim twins cache base colours — rebuild them for the new palette
+  scene.traverse(o => {
+    if (!o.isMesh || !o.userData.part) return;
+    const m = o.material; if (!m.userData.base) m.userData.base = m.color.clone();
+    if (o.userData.part === 'plinth') m.color.set(darkOn ? DARK.plinth : m.userData.base);
+    else if (o.userData.part === 'walkway') m.color.set(darkOn ? DARK.walkway : m.userData.base);
+    else if (o.userData.part === 'floor') m.color.copy(darkOn ? mix(o.userData.chip, '#1b1c1a', o.userData.dept === 'brain' ? 0.07 : 0.22) : m.userData.base); // the Brain's pale sage needs a lighter touch
+  });
+  hemi.color.set(darkOn ? 0x8e95a3 : 0xfdfff8); hemi.groundColor.set(darkOn ? 0x14151a : 0xd8d4c8); hemi.intensity = darkOn ? 0.75 : 0.85;
+  key.color.set(darkOn ? 0xe4e9f2 : 0xfff1dd); key.intensity = darkOn ? 1.5 : 2.2;
+  ground.material.opacity = darkOn ? 0.35 : 0.13;
+  if (focused && focused !== 'brain') applySceneDim(focused);
+  if (brain) brain.setTheme(darkOn);
+  mcp.setDark(darkOn);
+}
 
 // double-click empty space → straight back to overview
 canvas.addEventListener('dblclick', (e) => {
@@ -1294,6 +1321,7 @@ resize();
   if (h.get('appr')) requestApproval(h.get('appr') === '1' ? 'apay' : h.get('appr'));
   if (h.get('view') && LAYOUT[h.get('view')]) enterFocus(h.get('view'));
   if (h.get('cam')) setCam(h.get('cam') === '1');
+  if (h.get('dark') === '1' || document.body.classList.contains('dark')) setDark(true);
   if (h.get('board')) { // #board=1 → company board · #board=marketing → that dept's board
     const b = h.get('board');
     if (LAYOUT[b] && b !== 'brain') tasks.openFor(b); else tasks.open();
@@ -1301,7 +1329,7 @@ resize();
   syncOverviewBtn();
 }
 window.CC = { flyTo, zoomToDept, zoomOut, zoomToApproval, requestApproval, openAgent, view, applyCamera, R, emotes,
-  setCam, brain, connectorReveal: () => mcp.startReveal(performance.now()),
+  setCam, setDark, brain, connectorReveal: () => mcp.startReveal(performance.now()),
   toggleBoard: () => tasks.toggle(), addTask: (agentId, title) => tasks.addTask(agentId, title), tasks };
 
 let last = performance.now();

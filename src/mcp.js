@@ -675,5 +675,13 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     if (tipHideAt && now > tipHideAt) { tip.classList.remove('on'); tipHideAt = 0; }
   }
 
-  return { tick, sprites: [], onAgentEvent, showTip, startReveal }; // sprites: none clickable — docks retired
+  // dark mode: the two ink-coloured looms (Notion, ChatGPT) would vanish on a dark ground
+  function setDark(on) {
+    const ink = on ? '#E8E6DF' : '#151414';
+    SHARED.notion = ink; MODELS.chatgpt = ink;
+    const sh = shared.notion;
+    if (sh) { sh.ink = ink; sh.drop.setAttribute('stroke', ink); sh.jdot.setAttribute('fill', ink); for (const g of Object.values(sh.wires)) { g.path.setAttribute('stroke', ink); g.dot.setAttribute('fill', ink); } }
+    if (mwires.chatgpt) { mwires.chatgpt.path.setAttribute('stroke', ink); mwires.chatgpt.dot.setAttribute('fill', ink); }
+  }
+  return { tick, sprites: [], onAgentEvent, showTip, startReveal, setDark }; // sprites: none clickable — docks retired
 }

@@ -21,7 +21,7 @@ const DEPT_FOLDERS = {
   emails: ['60-Sales', '30-Customers', '10-Business'], ops: ['10-Business', '00-Meta', '95-Agents', '90-Skills'],
   fin: ['80-Finance', '10-Business'], delivery: ['70-Delivery', '50-Products'],
 };
-const INK = '21,20,20';
+let INK = '21,20,20'; // dark mode swaps this for the cream ink (setTheme)
 const GREEN = '#1E9070';
 const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 42);
 const timeStr = ts => new Date(ts).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
@@ -309,5 +309,6 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
   document.getElementById('bvClose').addEventListener('click', close);
   addEventListener('resize', () => { if (openNow) draw(); });
 
-  return { read, readNote, write, setGraph, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
+  function setTheme(dark) { INK = dark ? '236,234,227' : '21,20,20'; etch(); }
+  return { read, readNote, write, setGraph, setTheme, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
 }
