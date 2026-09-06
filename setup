@@ -1,70 +1,50 @@
 #!/bin/bash
-# Command Centre — one-command setup (macOS / Linux). Safe to re-run any time.
+# Agents Office — one-command setup (macOS / Linux). Safe to re-run any time.
 set -uo pipefail
+BOLD=$(tput bold 2>/dev/null || true); GREEN=$(tput setaf 2 2>/dev/null || true); RED=$(tput setaf 1 2>/dev/null || true); RESET=$(tput sgr0 2>/dev/null || true)
+ok(){ echo "${GREEN}✓${RESET} $1"; }; fail(){ echo "${RED}✗ $1${RESET}"; exit 1; }; step(){ echo; echo "${BOLD}$1${RESET}"; }
+ROOT="$(cd "$(dirname "$0")" && pwd)"; cd "$ROOT"
 
-BOLD=$(tput bold 2>/dev/null || true); GREEN=$(tput setaf 2 2>/dev/null || true)
-RED=$(tput setaf 1 2>/dev/null || true); RESET=$(tput sgr0 2>/dev/null || true)
-ok(){ echo "${GREEN}✓${RESET} $1"; }
-fail(){ echo "${RED}✗ $1${RESET}"; exit 1; }
-step(){ echo; echo "${BOLD}$1${RESET}"; }
-
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
-
-step "1/5 Checking the basics"
-command -v git >/dev/null 2>&1 || fail "git is missing. macOS: xcode-select --install · Linux: install git with your package manager, then re-run ./setup"
+step "1/4 Checking the basics"
+command -v git >/dev/null 2>&1 || fail "git is missing. macOS: xcode-select --install · Linux: install git, then re-run ./setup"
 ok "git"
-command -v node >/dev/null 2>&1 || fail "Node.js is missing. Install Node 20+ from https://nodejs.org (or brew install node), then re-run ./setup"
+command -v node >/dev/null 2>&1 || fail "Node.js is missing. Install Node 20+ from https://nodejs.org, then re-run ./setup"
 NODE_MAJOR=$(node -e 'console.log(process.versions.node.split(".")[0])')
-[[ "$NODE_MAJOR" -ge 20 ]] || fail "Node 20+ required (you have $(node --version)). Upgrade, then re-run ./setup"
+[[ "$NODE_MAJOR" -ge 20 ]] || fail "Node 20+ required (you have $(node --version))."
 ok "Node $(node --version)"
 
-step "2/5 Claude Code"
-if ! command -v claude >/dev/null 2>&1; then
+step "2/4 Claude"
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  ok "ANTHROPIC_API_KEY is set — the office will use the Claude API"
+elif command -v claude >/dev/null 2>&1; then
+  ok "Claude Code $(claude --version 2>/dev/null | head -1) — the office runs on your existing login"
+else
   echo "Installing Claude Code…"
   curl -fsSL https://claude.ai/install.sh | bash || fail "Claude Code install failed — install it from https://claude.com/claude-code then re-run ./setup"
   export PATH="$HOME/.local/bin:$PATH"
+  command -v claude >/dev/null 2>&1 || fail "claude is not on your PATH — open a NEW terminal and re-run ./setup"
+  ok "Claude Code installed. Run ${BOLD}claude${RESET} once to log in (browser), type exit, then come back."
 fi
-command -v claude >/dev/null 2>&1 || fail "claude is not on your PATH — open a NEW terminal and re-run ./setup"
-ok "Claude Code $(claude --version 2>/dev/null | head -1 || echo installed)"
-echo "  Agents run on YOUR Claude login (Pro/Max) — no API key."
-echo "  Not logged in yet? Run ${BOLD}claude${RESET} once, follow the browser login, type exit, then re-run ./setup."
 
-step "3/5 Dependencies"
+step "3/4 Dependencies + build"
 npm install --no-fund --no-audit >/dev/null 2>&1 || fail "npm install failed — run it by hand to see why: npm install"
 ok "npm packages"
+node build.mjs >/dev/null 2>&1 || fail "build failed — run: node build.mjs"
+ok "office built (the Brain graph comes from the folder in office.config.json)"
 
-step "4/5 Your office"
-mkdir -p office/agents office/inbox office/state office/logs office/brain
-ok "office/ folders (agents · inbox · state · logs · brain)"
-if [[ ! -f office.config.json ]]; then
-  cp office.config.example.json office.config.json
-  ok "office.config.json created from the example — EDIT IT: name your departments and agents"
-else
-  ok "office.config.json already exists — leaving it alone"
-fi
-
-step "5/5 First boot check"
-PORT=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('office.config.json','utf8')).port??4477)}catch{console.log(4477)}")
+step "4/4 First boot"
+PORT=$(node -e "import('./config.mjs').then(m=>console.log(m.loadConfig().port))")
 if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
-  echo "  Port $PORT is already in use — skipping the boot test (is an office already running?)."
+  echo "  Port $PORT is already in use — skipping the boot test (is the office already running?)."
 else
-  node bin/office start > office/logs/setup-boot.log 2>&1 &
-  BOOT_PID=$!
-  UP=""
-  for _ in $(seq 1 10); do
-    if curl -sf "http://localhost:$PORT/api/office" >/dev/null 2>&1; then UP=1; break; fi
-    sleep 1
-  done
-  kill "$BOOT_PID" 2>/dev/null
-  [[ -n "$UP" ]] || fail "The daemon didn't come up — check office/logs/setup-boot.log"
-  ok "Daemon boots clean on port $PORT"
+  node serve.mjs > /tmp/agents-office-setup.log 2>&1 & BOOT=$!
+  UP=""; for _ in $(seq 1 15); do curl -sf "http://localhost:$PORT/api/health" >/dev/null 2>&1 && { UP=1; break; }; sleep 1; done
+  kill "$BOOT" 2>/dev/null
+  [[ -n "$UP" ]] || fail "The office didn't come up — see /tmp/agents-office-setup.log"
+  ok "Office boots on port $PORT"
 fi
 
-echo
-echo "${GREEN}${BOLD}Setup complete.${RESET}"
-echo
-echo "  1. Edit ${BOLD}office.config.json${RESET} — your departments, your agents (max 6 depts, 4 agents each)."
-echo "  2. Start the office:   ${BOLD}bin/office start${RESET}"
-echo "  3. Open it:            ${BOLD}http://localhost:$PORT${RESET}"
-echo "  4. Hire your first agent from any vacant desk — or: bin/office new-agent"
+echo; echo "${GREEN}${BOLD}Setup complete.${RESET}"; echo
+echo "  1. Point it at your notes: edit ${BOLD}office.config.json${RESET} (name, brain folder). The sample brain works out of the box."
+echo "  2. Start:  ${BOLD}npm start${RESET}"
+echo "  3. Open:   ${BOLD}http://localhost:$PORT${RESET} — type a task in the bar, pick a department, press Add."

@@ -1,0 +1,6 @@
+{
+  "name": "Northgate Studio",
+  "brain": "./brain",
+  "port": 4520,
+  "model": ""
+}

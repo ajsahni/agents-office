@@ -1,8 +1,0 @@
-{
-  "port": 4477,
-  "brain": null,
-  "departments": [
-    { "name": "Research", "agents": ["scout", "digger"] },
-    { "name": "Content", "agents": ["writer"] }
-  ]
-}
