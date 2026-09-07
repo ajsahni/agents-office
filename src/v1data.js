@@ -627,6 +627,46 @@ export const V1 = [
   chips:['What changed this week?','Build me a new view','Anything broken?'] },
 
 /* ============ DELIVERY (V3.1, 5 Sep 2026 — new department) ============ */
+{ id:'mlead', name:'MARKETING LEAD', dept:'marketing', desk:[3,0], sit:[3,1], hair:'#2a1a0e', shirt:'#f87171', lead:true,
+  role:'Marketing Lead',
+  tagline:'Runs the marketing team — six agents report to it — owns the content calendar and the ad budget, and reports what worked to AJ weekly.',
+  tasks:['Reviewing the week’s content before it ships','Rebalancing the ad budget toward the winner','Setting the reel line-up for next week','Writing the weekly marketing summary','Briefing Research on the next angle'],
+  ev:[
+    {i:'🧭', t:()=>`Team review: ${ri(3,6)} reels cut, newsletter issue ${ri(30,34)} ${rnd(['scheduled','in draft','sent'])}, ad set ${rnd(['refreshed','held','scaled'])} — ${rnd(['all on plan','one reel sent back for a stronger hook','two creatives swapped'])}`, p:3},
+    {i:'📈', t:()=>`Weekly numbers: reach ${rnd(['up','flat','down'])} ${ri(4,28)}%, ${ri(2,5)} posts above the baseline multiple, CPA $${ri(24,38)}`, p:2},
+    {i:'🎓', t:()=>`Coached ${rnd(['INSTAGRAM ORGANIC','NEWSLETTER','META ADS'])} — ${rnd(['hook first, promise second','one idea per reel','kill the sub-baseline variant sooner'])}`, brain:true, p:1},
+  ],
+  stats:[['Posts this week','6'],['Above baseline','2'],['Ad spend today','$684'],['Newsletter open rate','41%']],
+  chartLbl:'Posts above baseline — last 8 weeks', chart:[1,2,1,3,2,2,3,2],
+  greeting:`Morning AJ. Six posts out this week, two above the baseline multiple. Meta CPA is holding at $${ri(26,32)}; I've asked Meta Ads to shift $50 a day into the winner. The October content plan is in your approvals.`,
+  chat:[
+    {k:['plan','calendar','week','next'], r:[`Next week: three reels (Research has the angles), newsletter issue ${ri(31,34)}, and one ad refresh. Video Editor has capacity; Graphics is at 80%. Say the word and I'll swap a reel for a carousel.`]},
+    {k:['ads','spend','cpa','budget'], r:[`Ad spend today $684, CPA $${ri(26,32)}. One creative is fatigued — Meta Ads has a refresh in progress. I don't scale anything past $180 a day without your tick.`]},
+    {k:['working','what worked','best','top'], r:[`Best this week: the "10am rule" reel at ${(ri(21,34)/10).toFixed(1)}× baseline. Worst: the pricing carousel, under 0.5×. Research is pulling the angle apart to see why.`]},
+  ],
+  fallback:[`I run marketing — the plan, the budget, what worked. Ask about next week, the ads, or the numbers.`,`Try "what's the plan next week?", "how are the ads doing?" or "what worked?".`],
+  chips:['What’s the plan next week?','How are the ads doing?','What worked?'] },
+
+{ id:'olead', name:'OPERATIONS LEAD', dept:'ops', desk:[15,6], sit:[15,7], hair:'#111111', shirt:'#a78bfa', lead:true,
+  role:'Operations Lead',
+  tagline:'Runs operations — five agents report to it — keeps contracts, compliance, intel and reporting moving, and escalates only what needs AJ.',
+  tasks:['Reviewing the week’s contracts and compliance flags','Prioritising Intel’s findings for the team','Chasing the {count} open vendor renewals','Writing the weekly operations summary','Prepping the board pack sections'],
+  ev:[
+    {i:'🧭', t:()=>`Ops review: ${ri(2,5)} agreements reviewed, ${ri(0,2)} compliance flags, ${ri(1,3)} intel memos — ${rnd(['nothing for AJ','one clause escalated','one renewal held for a better rate'])}`, p:3},
+    {i:'📋', t:()=>`Board pack: ${ri(3,6)}/6 sections done, dashboards ${rnd(['refreshed','refreshing','stale — chased'])}`, p:2},
+    {i:'⚠', t:()=>`Escalated: ${rnd(['liability cap in the Kea Logistics MSA','AU privacy wording change','vendor SLA missed twice'])} — needs AJ`, p:1},
+  ],
+  stats:[['Agreements this month','9'],['Open flags','1'],['Renewals due','3'],['Board pack','5 / 6']],
+  chartLbl:'Agreements reviewed — last 8 weeks', chart:[2,1,3,2,2,3,2,3],
+  greeting:`Morning AJ. Quiet week in ops: nine agreements reviewed, one clause escalated to you, no compliance flags open. Three vendor renewals are due this month — I've held one for a better rate. The Q4 checklist is in your approvals.`,
+  chat:[
+    {k:['contract','agreement','legal','clause'], r:[`Legal Review has ${ri(2,4)} agreements in hand. One escalation: the liability cap in the Kea Logistics MSA is below our floor — I've held it for you rather than guess.`]},
+    {k:['compliance','regulation','privacy','flag'], r:[`No open compliance flags. Compliance Checker diffs the AU and NZ regulator pages daily; the last change was privacy wording, already reflected on the forms.`]},
+    {k:['renewal','vendor','board','report'], r:[`Three renewals due this month. One held for a better rate, two on track. Board pack is five of six sections; dashboards refresh tonight.`]},
+  ],
+  fallback:[`I run operations — contracts, compliance, intel, reporting. Ask what's escalated, what's due, or how the board pack is going.`,`Try "anything escalated?", "what's due this month?" or "how's the board pack?".`],
+  chips:['Anything escalated?','What’s due this month?','How’s the board pack?'] },
+
 { id:'dlead', name:'DELIVERY LEAD', dept:'delivery', desk:[12,0], sit:[12,1], hair:'#1f1f1f', shirt:'#38bdf8', lead:true,
   role:'Delivery Lead',
   tagline:'Owns every live project end to end — risk, timelines, staffing, handovers — and reports the state of play to AJ weekly.',

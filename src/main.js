@@ -1356,6 +1356,8 @@ resize();
   if (h.get('view') && LAYOUT[h.get('view')]) enterFocus(h.get('view'));
   if (h.get('cam')) setCam(h.get('cam') === '1');
   if (h.get('dark') === '1' || document.body.classList.contains('dark')) setDark(true);
+  // typing #dark=1 into an OPEN tab is a same-document hash change (no reload) — react to it live
+  addEventListener('hashchange', () => { const d = new URLSearchParams(location.hash.slice(1)).get('dark'); if (d === '1') setDark(true); else if (d === '0') setDark(false); });
   if (h.get('board')) { // #board=1 → company board · #board=marketing → that dept's board
     const b = h.get('board');
     if (LAYOUT[b] && b !== 'brain') tasks.openFor(b); else tasks.open();

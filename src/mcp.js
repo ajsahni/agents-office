@@ -15,7 +15,7 @@ import { MCP_LOGOS, MCP_BY_DEPT } from './mcplogos.js';
 // agent → tools they'd plausibly be driving (falls back to any connector in the dept's dock)
 export const AGENT_MCP = {
   // marketing
-  ada: ['meta', 'clarity'], newt: ['beehiiv', 'loops'], gfx: ['canva'], iggy: ['canva', 'clarity'], riley: ['meta', 'beehiiv', 'clarity', 'notion'],
+  mlead: ['meta', 'clarity', 'notion'], ada: ['meta', 'clarity'], newt: ['beehiiv', 'loops'], gfx: ['canva'], iggy: ['canva', 'clarity'], riley: ['meta', 'beehiiv', 'clarity', 'notion'],
   vid: ['hyperframes', 'canva'],
   // emails
   elead: ['gmail', 'notion'], cmail: ['gmail'], imail: ['gmail', 'notion'], vmail: ['gmail'], kmail: ['gmail'],
@@ -23,7 +23,7 @@ export const AGENT_MCP = {
   enzo: ['fullenrich'], lexi: ['notion', 'gmail'], ilm: ['gmail', 'imessage', 'fullenrich'], pros: ['apollo', 'gmail'],
   piper: ['notion', 'gmail'], folo: ['gmail', 'imessage'],
   // operations
-  scout: ['notion'], legal: ['pandadoc', 'gmail'], comply: ['notion', 'gmail'], report: ['gmail', 'notion'], dash: ['notion'],
+  olead: ['notion', 'gmail', 'pandadoc'], scout: ['notion'], legal: ['pandadoc', 'gmail'], comply: ['notion', 'gmail'], report: ['gmail', 'notion'], dash: ['notion'],
   // finance
   alead: ['xero', 'gmail'],
   invo: ['xero', 'stripe'], apay: ['xero'], recon: ['stripe', 'xero'],

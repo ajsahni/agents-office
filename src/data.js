@@ -25,7 +25,7 @@ export const DEPTS = {
   brain:     { name: 'THE BRAIN',        short: 'THE BRAIN', chip: '#D1DECD', ink: '#4C7A57', floor: '#E9EFE4' },
 };
 
-// 33 agents (V3.1). grid = [col,row] desk slot on the department plinth.
+// 35 agents (V3.4, 7 Sep 2026: every department has a lead). grid = [col,row] desk slot on the department plinth.
 export const AGENTS = [
   // EMAILS (5) — replaced Customer Support, 5 Sep 2026
   { id: 'elead', name: 'EMAILS LEAD',         dept: 'emails',    lead: true,  grid: [0.5, 0], hair: '#2b2b2b', skin: '#E8B98E' },
@@ -40,19 +40,21 @@ export const AGENTS = [
   { id: 'pros',  name: 'PROSPECTOR',          dept: 'sales',     grid: [0, 2], hair: '#2a1a0e', skin: '#E8B98E' },
   { id: 'piper', name: 'PROPOSALS',           dept: 'sales',     grid: [1, 2], hair: '#2d1a0a', skin: '#F0C9A0' },
   { id: 'folo',  name: 'FOLLOW UPS',          dept: 'sales',     grid: [0.5, 3], hair: '#171717', skin: '#F5D5B0' },
-  // MARKETING (6)
-  { id: 'riley', name: 'RESEARCH',            dept: 'marketing', grid: [0, 0], hair: '#8a4a1f', skin: '#F5D5B0' },
-  { id: 'newt',  name: 'NEWSLETTER',          dept: 'marketing', grid: [1, 0], hair: '#26140a', skin: '#D89F70' },
-  { id: 'gfx',   name: 'GRAPHICS DESIGNER',   dept: 'marketing', grid: [0, 1], hair: '#141414', skin: '#F0C9A0' },
-  { id: 'ada',   name: 'META ADS',            dept: 'marketing', grid: [1, 1], hair: '#3d2814', skin: '#C68B59' },
-  { id: 'iggy',  name: 'INSTAGRAM ORGANIC',   dept: 'marketing', grid: [0, 2], hair: '#552200', skin: '#E8B98E' },
-  { id: 'vid',   name: 'VIDEO EDITOR',        dept: 'marketing', grid: [1, 2], hair: '#1b1b24', skin: '#D9A97E' },
-  // OPERATIONS (5) — Internal Dashboards joins; Proposals moved to Sales
-  { id: 'scout', name: 'INTEL',               dept: 'ops',       grid: [0, 0], hair: '#101820', skin: '#B07850' },
-  { id: 'legal', name: 'LEGAL REVIEW',        dept: 'ops',       grid: [1, 0], hair: '#20242e', skin: '#F0C9A0' },
-  { id: 'comply', name: 'COMPLIANCE CHECKER', dept: 'ops',       grid: [0, 1], hair: '#5a3a1a', skin: '#C68B59' },
-  { id: 'report', name: 'INTERNAL REPORTING', dept: 'ops',       grid: [1, 1], hair: '#2e2118', skin: '#E8B98E' },
-  { id: 'dash',  name: 'INTERNAL DASHBOARDS', dept: 'ops',       grid: [0.5, 2], hair: '#0d0d0d', skin: '#9C6B43' },
+  // MARKETING (7) — Marketing Lead at the head since 7 Sep 2026
+  { id: 'mlead', name: 'MARKETING LEAD',      dept: 'marketing', lead: true,  grid: [0.5, 0], hair: '#2a1a0e', skin: '#E0A878' },
+  { id: 'riley', name: 'RESEARCH',            dept: 'marketing', grid: [0, 1], hair: '#8a4a1f', skin: '#F5D5B0' },
+  { id: 'newt',  name: 'NEWSLETTER',          dept: 'marketing', grid: [1, 1], hair: '#26140a', skin: '#D89F70' },
+  { id: 'gfx',   name: 'GRAPHICS DESIGNER',   dept: 'marketing', grid: [0, 2], hair: '#141414', skin: '#F0C9A0' },
+  { id: 'ada',   name: 'META ADS',            dept: 'marketing', grid: [1, 2], hair: '#3d2814', skin: '#C68B59' },
+  { id: 'iggy',  name: 'INSTAGRAM ORGANIC',   dept: 'marketing', grid: [0, 3], hair: '#552200', skin: '#E8B98E' },
+  { id: 'vid',   name: 'VIDEO EDITOR',        dept: 'marketing', grid: [1, 3], hair: '#1b1b24', skin: '#D9A97E' },
+  // OPERATIONS (6) — Operations Lead at the head since 7 Sep 2026; Internal Dashboards joins; Proposals moved to Sales
+  { id: 'olead', name: 'OPERATIONS LEAD',     dept: 'ops',       lead: true,  grid: [0.5, 0], hair: '#111111', skin: '#F0C9A0' },
+  { id: 'scout', name: 'INTEL',               dept: 'ops',       grid: [0, 1], hair: '#101820', skin: '#B07850' },
+  { id: 'legal', name: 'LEGAL REVIEW',        dept: 'ops',       grid: [1, 1], hair: '#20242e', skin: '#F0C9A0' },
+  { id: 'comply', name: 'COMPLIANCE CHECKER', dept: 'ops',       grid: [0, 2], hair: '#5a3a1a', skin: '#C68B59' },
+  { id: 'report', name: 'INTERNAL REPORTING', dept: 'ops',       grid: [1, 2], hair: '#2e2118', skin: '#E8B98E' },
+  { id: 'dash',  name: 'INTERNAL DASHBOARDS', dept: 'ops',       grid: [0.5, 3], hair: '#0d0d0d', skin: '#9C6B43' },
   // FINANCE (4) — the accounting team; Accounting Lead at the head
   { id: 'alead', name: 'ACCOUNTING LEAD',     dept: 'fin',       lead: true,  grid: [0.5, 0], hair: '#1f1f1f', skin: '#E0A878' },
   { id: 'invo',  name: 'INVOICING',           dept: 'fin',       grid: [0, 1], hair: '#4a2a10', skin: '#F5D5B0' },
@@ -74,9 +76,9 @@ export const LAYOUT = {
   emails:    { pos: [-30, -23], w: 20, d: 26 },
   delivery:  { pos: [0, -48],   w: 20, d: 30 },   // 6th pod mirrors ops on the top axis
   sales:     { pos: [30, -23],  w: 20, d: 30 },
-  marketing: { pos: [-30, 23],  w: 20, d: 26 },
+  marketing: { pos: [-30, 23],  w: 20, d: 30 },
   fin:       { pos: [30, 23],   w: 20, d: 26 },
-  ops:       { pos: [0, 48],    w: 20, d: 26 },   // the 5th pod fills the empty bottom-left gap
+  ops:       { pos: [0, 48],    w: 20, d: 30 },   // the 5th pod fills the empty bottom-left gap
 };
 
 // Department billboard metrics (v1 rule #5: live metrics float above each dept,
@@ -113,6 +115,8 @@ export const APPROVAL_BY_AGENT = {
   iggy:  'Publish reel “the 10am rule” to Instagram — script attached',
   vid:   'Ship the 45-sec demo cut — captions burned in, v2 attached',
   ada:   'Scale “cold call anxiety” creative to $180/day — CPA $29',
+  mlead: 'Approve the October content plan — 12 reels, 2 newsletters, 1 ad refresh',
+  olead: 'Sign off the Q4 operations checklist — 3 vendor renewals inside',
   newt:  'Send the August newsletter to 3,400 subscribers — draft v3 attached',
   scout: 'Green-light the CallForge comparison play — memo attached',
   enzo:  'Buy 500 FullEnrich credits — current batch runs out tomorrow',

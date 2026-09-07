@@ -40,9 +40,9 @@ await step('build: graph has linked notes', async () => {
 await step('roster: office.agents.json validates', async () => {
   const { loadRoster } = await import('./roster.mjs');
   const r = loadRoster();
-  if (r.agents.length !== 33) throw new Error('agents: ' + r.agents.length);
+  if (r.agents.length !== 35) throw new Error('agents: ' + r.agents.length);
   if (r.problems.length) throw new Error(r.problems.join(' | '));
-  return `33 agents · ${r.customised} customised${r.files.length ? ' · ' + r.files.join(' + ') : ''}`;
+  return `35 agents · ${r.customised} customised${r.files.length ? ' · ' + r.files.join(' + ') : ''}`;
 });
 await step('roster: bad edits are refused, not applied', async () => {
   const { validate } = await import('./roster.mjs');
@@ -140,7 +140,7 @@ else {
     const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 120)); });
     await page.goto('file://' + path.join(ROOT, 'dist', 'command-centre-v2.html') + '?s=check'); await page.waitForTimeout(3000);
     await step('smoke: loads without page errors', async () => { if (errors.length) throw new Error(errors[0]); });
-    await step('smoke: 33 agents at their desks', async () => { const n = await page.evaluate(() => Object.keys(window.CC.R).length); if (n !== 33) throw new Error('agents: ' + n); return n + ' agents'; });
+    await step('smoke: 35 agents at their desks', async () => { const n = await page.evaluate(() => Object.keys(window.CC.R).length); if (n !== 35) throw new Error('agents: ' + n); return n + ' agents'; });
     await step('smoke: six department cards + the Brain tag', async () => {
       const t = await page.evaluate(() => [...document.querySelectorAll('.badge .b-name')].map(e => e.textContent.trim()));
       for (const k of ['EMAILS', 'SALES', 'MARKETING', 'OPERATIONS', 'FINANCE', 'DELIVERY', 'THE BRAIN']) if (!t.some(x => x.startsWith(k))) throw new Error('missing card ' + k);
@@ -205,7 +205,7 @@ else {
       const c = m.servers.filter(s => s.status === 'connected').length;
       return `${m.servers.length} servers · ${c} connected · agents get tools: ${m.tools ? 'yes' : 'no (API backend)'}${m.web ? ' + web' : ''}`;
     });
-    await step('server: /api/health carries the roster', async () => { if (!Array.isArray(up.agents) || up.agents.length !== 33) throw new Error('agents: ' + (up.agents && up.agents.length)); if (!up.agents[0].does) throw new Error('no job description'); });
+    await step('server: /api/health carries the roster', async () => { if (!Array.isArray(up.agents) || up.agents.length !== 35) throw new Error('agents: ' + (up.agents && up.agents.length)); if (!up.agents[0].does) throw new Error('no job description'); });
     await step('server: /api/skills lists the skills and who has them', async () => {
       const s = await (await fetch(base + '/api/skills')).json(); if (!s.count || !Array.isArray(s.skills)) throw new Error('no skills');
       const piper = up.agents.find(a => a.id === 'piper'); if (!piper.skills?.includes('proposal')) throw new Error('health roster has no skills on piper');

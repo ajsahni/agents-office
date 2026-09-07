@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.0-beta.1 — 7 Sep 2026
+
+- Every department now has a lead. Marketing Lead and Operations Lead join at the head of their pods (35 agents). Each runs their team, owns the department's set-up interview, and is where a task lands when Claude cannot pick a specialist.
+
 ## 3.3.0-beta.2 — 7 Sep 2026
 
 - The built office page moved from the repo root to `dist/command-centre-v2.html`. Same file, same double-click demo, cleaner repo page. `build.mjs`, `npm start` and the checks all point there.

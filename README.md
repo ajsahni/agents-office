@@ -4,7 +4,7 @@
 
 A 3D isometric office where AI agents do real work on your own Claude login.
 
-Six departments, thirty-three agents at their desks, a task bar that routes what you type to the
+Six departments, thirty-five agents at their desks, a task bar that routes what you type to the
 right agent, and a Brain at the centre that is your own folder of notes. Type a task, the office
 gives it to the right person, they read your notes, use the connectors you have already set up
 in Claude Code, do the work, and file the result back into your notes. Everything runs on your
@@ -78,9 +78,9 @@ Tool use needs the Claude Code login; on an `ANTHROPIC_API_KEY` the agents write
 
 ## Make the agents yours
 
-The 33 agents are in `office.agents.json`: an id, a department, a name, a role, what they do,
+The 35 agents are in `office.agents.json`: an id, a department, a name, a role, what they do,
 and the connectors they usually use. Change the name, the role, what they do and their tools.
-Departments, leads and seats are fixed: six pods, 33 desks, that is the office. A new kind of
+Departments, leads and seats are fixed: six pods, 35 desks, that is the office. A new kind of
 agent is a renamed seat in the right department.
 
 The easy way is to let Claude do it. Open Claude Code in this folder and say what you want:
@@ -217,7 +217,7 @@ first thing to run after any change.
 | `src/` | The office: `main.js` scene, `tasks.js` task panel, `brain.js` the Brain, `mcp.js` connectors, `data.js` departments and roster, `v1data.js` agent personalities |
 | `serve.mjs` | The local server: routing, deliverables, chat, the live Brain graph |
 | `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
-| `roster.mjs` · `office.agents.json` | The 33 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |
+| `roster.mjs` · `office.agents.json` | The 35 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |
 | `skills.mjs` · `skills/` | Skills: how a kind of work is done, bound to agents or departments (`<brain>/Agents Office/skills/` is yours) |
 | `learn.mjs` | Corrections from `revise: …` recorded per agent in `<brain>/Agents Office/feedback/`; standing rules go back into the prompt |
 | `onboard.mjs` | The lead's five-question set-up interview; writes briefs and a skill into the brain |

@@ -1,5 +1,5 @@
 {
-  "_about": "The 33 agents of your office. Change name, role, does, tools and brief (standing instructions) freely; id, department and lead are fixed (six pods, 33 seats). Put personal edits in office.agents.local.json (gitignored) so git pull never overwrites them. Ask Claude Code in this folder to change agents for you — see CLAUDE.md.",
+  "_about": "The 35 agents of your office. Change name, role, does, tools and brief (standing instructions) freely; id, department and lead are fixed (six pods, 35 seats). Put personal edits in office.agents.local.json (gitignored) so git pull never overwrites them. Ask Claude Code in this folder to change agents for you — see CLAUDE.md.",
   "agents": [
     {
       "id": "elead",
@@ -131,6 +131,19 @@
       ]
     },
     {
+      "id": "mlead",
+      "department": "marketing",
+      "lead": true,
+      "name": "MARKETING LEAD",
+      "role": "Marketing Lead",
+      "does": "Runs the marketing team — six agents report to it — owns the content calendar and the ad budget, and reports what worked to AJ weekly.",
+      "tools": [
+        "meta",
+        "clarity",
+        "notion"
+      ]
+    },
+    {
       "id": "riley",
       "department": "marketing",
       "lead": false,
@@ -201,6 +214,19 @@
       "tools": [
         "hyperframes",
         "canva"
+      ]
+    },
+    {
+      "id": "olead",
+      "department": "ops",
+      "lead": true,
+      "name": "OPERATIONS LEAD",
+      "role": "Operations Lead",
+      "does": "Runs operations — five agents report to it — keeps contracts, compliance, intel and reporting moving, and escalates only what needs AJ.",
+      "tools": [
+        "notion",
+        "gmail",
+        "pandadoc"
       ]
     },
     {
