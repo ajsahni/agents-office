@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0-beta.2 — 7 Sep 2026
+
+- The Brain graph header names your business (it was hard-coded to one company).
+
 ## 3.1.0-beta.1 — 7 Sep 2026
 
 - **Connectors are real.** The top bar shows the MCP servers your Claude Code is connected to (`claude mcp list`), not a demo list. Servers that need authentication show grey with the reason on hover and are not wired to any pod. Unknown servers get an initials tile. Nothing connected? The bar says so.

@@ -297,10 +297,12 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
     }
     requestAnimationFrame(draw);
   }
+  let owner = 'YOUR NOTES'; // V3.1: the business name when served (was hard-coded to one company)
+  function setOwner(name) { owner = String(name || 'YOUR NOTES').toUpperCase(); if (openNow) meta.textContent = `${owner} · ${state.notes.toLocaleString('en-NZ')} NOTES · ${links.length} LINKS`; }
   function open() {
     if (openNow) return;
     openNow = true; ov.classList.add('on'); document.body.classList.add('brainOpen');
-    meta.textContent = `SAHNI.AI · ${state.notes.toLocaleString('en-NZ')} NOTES · ${links.length} LINKS`;
+    meta.textContent = `${owner} · ${state.notes.toLocaleString('en-NZ')} NOTES · ${links.length} LINKS`;
     chips(); if (!sel) pane.innerHTML = '<div class="bv-empty">Click a note to read it. Hover to see its neighbours.</div>';
     requestAnimationFrame(draw);
   }
@@ -310,5 +312,5 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
   addEventListener('resize', () => { if (openNow) draw(); });
 
   function setTheme(dark) { INK = dark ? '236,234,227' : '21,20,20'; etch(); }
-  return { read, readNote, write, setGraph, setTheme, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
+  return { read, readNote, write, setGraph, setTheme, setOwner, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
 }

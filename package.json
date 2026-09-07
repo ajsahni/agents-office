@@ -1,6 +1,6 @@
 {
   "name": "agents-office",
-  "version": "3.1.0-beta.1",
+  "version": "3.1.0-beta.2",
   "description": "Agents Office v3 (Beta) \u2014 a 3D isometric office where AI agents do real work on your own Claude login",
   "type": "module",
   "private": true,
