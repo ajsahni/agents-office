@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0-beta.3 — 7 Sep 2026
+
+- One HTML file. The separate dark build is gone; `D` and http://localhost:4520/dark open the same file in dark mode.
+
 ## 3.1.0-beta.2 — 7 Sep 2026
 
 - The Brain graph header names your business (it was hard-coded to one company).

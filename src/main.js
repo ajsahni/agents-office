@@ -515,7 +515,7 @@ addEventListener('keydown', (e) => {
 // camera mode: mid-tone backdrop for filming the screen (#cam=1 / V toggles)
 function setCam(on) { document.body.classList.toggle('cam', !!on); }
 // DARK MODE (AJ, 6 Sep 2026: "make another one in dark mode as I will show both"): D toggles, #dark=1
-// forces it, command-centre-v2-dark.html opens in it. The chrome follows the CSS tokens; the scene
+// forces it, /dark on the server opens in it. The chrome follows the CSS tokens; the scene
 // re-tints its shared materials (plinths, floors, walkways), relights, and the Brain/wires swap ink.
 let darkOn = false;
 const DARK = { plinth: 0x2c2d2b, walkway: 0x303230, ground: 0x1b1c1a };

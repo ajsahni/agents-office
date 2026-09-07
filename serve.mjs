@@ -28,7 +28,6 @@ import { loadRoster } from './roster.mjs';
 
 const cfg = loadConfig();
 const HTML = path.join(ROOT, 'command-centre-v2.html');
-const HTML_DARK = path.join(ROOT, 'command-centre-v2-dark.html');
 const DATA = path.join(ROOT, 'data');
 const FILE = path.join(DATA, 'tasks.json');
 const BRAIN = cfg.brainPath;
@@ -205,7 +204,8 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/command-centre-v2.html' || url.pathname === '/dark')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      return res.end(fs.readFileSync(url.pathname === '/dark' && fs.existsSync(HTML_DARK) ? HTML_DARK : HTML));
+      const page = fs.readFileSync(HTML, 'utf8');
+      return res.end(url.pathname === '/dark' ? page.replace('<body>', '<body class="dark">') : page); // /dark: the same file, opened in dark mode
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, version, backend, model: cfg.model || (sdk ? 'claude-opus-5' : 'your Claude Code default'), name: cfg.name, brain: BRAIN, notes: graph.notes, depts: DEPT_KEYS,
       agents: agentsOut(), roster: { customised: roster.customised, files: roster.files, problems: roster.problems }, tools: backend === 'claude-cli', mcp: mcp.summary() });

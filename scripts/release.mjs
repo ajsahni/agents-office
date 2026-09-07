@@ -38,7 +38,6 @@ for (const f of FILES) {
 }
 fs.copyFileSync(path.join(ROOT, '.gitignore.release'), path.join(OUT, '.gitignore'));
 fs.copyFileSync(path.join(ROOT, 'command-centre-v2.html'), path.join(OUT, 'command-centre-v2.html'));
-fs.copyFileSync(path.join(ROOT, 'command-centre-v2-dark.html'), path.join(OUT, 'command-centre-v2-dark.html'));
 // the shipped braingraph.js must come from the sample brain — guard against a private vault leaking
 const bg = fs.readFileSync(path.join(OUT, 'src', 'braingraph.js'), 'utf8');
 if (!/MOC-Sales/.test(bg) || /sahni|territool/i.test(bg)) throw new Error('braingraph.js does not look like the sample brain — refusing to release');
