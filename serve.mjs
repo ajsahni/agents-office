@@ -17,6 +17,9 @@
 // roster.mjs). Tool calls only happen on the CLI backend: the SDK path has no MCP servers.
 // V3.2: how the work is done is yours too — each agent's `brief` (roster.mjs) and the skills
 // bound to it (skills.mjs: skills/ + <brain>/Agents Office/skills/) go into every task and chat.
+// V3.3: the agents learn — every "revise: …" is recorded and standing rules come back into the
+// prompt (learn.mjs); a department lead interviews the owner in chat and writes the briefs and a
+// skill for its team (onboard.mjs). Roster, skills and lessons are re-read before every task.
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,6 +31,8 @@ import { DEPTS, DEPT_KEYS } from './src/data.js';
 import * as mcp from './mcp.mjs';
 import { loadRoster } from './roster.mjs';
 import { loadSkills } from './skills.mjs';
+import * as learn from './learn.mjs';
+import * as onboard from './onboard.mjs';
 
 const cfg = loadConfig();
 const HTML = path.join(ROOT, 'command-centre-v2.html');
@@ -44,7 +49,16 @@ const AGENTS = roster.agents; // id · department · lead · name · role · doe
 for (const w of roster.problems) console.warn('agents:', w);
 let skills = loadSkills(BRAIN, AGENTS); // reloaded before every task and chat, so a new skill needs no restart
 for (const w of skills.problems) console.warn('skills:', w);
-const refreshSkills = () => { const s = loadSkills(BRAIN, AGENTS); if (s.problems.join() !== skills.problems.join()) for (const w of s.problems) console.warn('skills:', w); skills = s; return s; };
+// the roster's editable fields are re-read too (a brief written by the lead's interview, or by hand, lands without a restart)
+function reloadRoster() {
+  const r = loadRoster(BRAIN);
+  for (const a of r.agents) { const cur = AGENTS.find(x => x.id === a.id); if (cur) Object.assign(cur, { name: a.name, role: a.role, does: a.does, tools: a.tools, brief: a.brief }); }
+  if (r.problems.join() !== roster.problems.join()) for (const w of r.problems) console.warn('agents:', w);
+  Object.assign(roster, { problems: r.problems, customised: r.customised, briefed: r.briefed, files: r.files });
+}
+const refreshSkills = () => { reloadRoster(); const s = loadSkills(BRAIN, AGENTS); if (s.problems.join() !== skills.problems.join()) for (const w of s.problems) console.warn('skills:', w); skills = s; return s; };
+const leadOf = dept => AGENTS.find(a => a.department === dept && a.lead) || AGENTS.find(a => a.department === dept);
+const setupMap = () => Object.fromEntries(DEPT_KEYS.map(k => [k, onboard.isSetUp(AGENTS, skills, k)]));
 
 let backend = 'claude-cli', sdk = null;
 if (process.env.ANTHROPIC_API_KEY) {
@@ -148,7 +162,8 @@ const persona = a => `${a.name}${a.lead ? ' (lead)' : ''} · ${a.role} · ${a.do
 function rosterText(dept) { return AGENTS.filter(a => a.department === dept).map(a => { const sk = skills.names(a); return `- ${a.id} · ${persona(a)}${sk.length ? ' · skills: ' + sk.join(', ') : ''}`; }).join('\n'); }
 // what an agent is told about itself: the job, the owner's standing instructions, the skills it follows
 function agentBrief(a) {
-  return (a.brief ? `\nSTANDING INSTRUCTIONS FROM THE OWNER\n${a.brief}\n` : '') + (skills.promptText(a) ? `\n${skills.promptText(a)}\n` : '');
+  const lessons = learn.promptText(BRAIN, a);
+  return (a.brief ? `\nSTANDING INSTRUCTIONS FROM THE OWNER\n${a.brief}\n` : '') + (skills.promptText(a) ? `\n${skills.promptText(a)}\n` : '') + (lessons ? `\n${lessons}\n` : '');
 }
 const toolKeys = names => [...new Set(names.map(n => /^mcp__/.test(n) ? mcp.keyOf(n) : n === 'WebSearch' || n === 'WebFetch' ? 'web' : null).filter(Boolean))];
 async function route(dept, text) {
@@ -209,7 +224,8 @@ const body = req => new Promise((resolve, reject) => { let s = ''; req.on('data'
 
 await rebuildGraph();
 const discovering = mcp.discover().then(l => { console.log(`  connectors: ${l.filter(s => s.status === 'connected').length} connected of ${l.length} (claude mcp list)`); return l; });
-const agentsOut = () => AGENTS.map(a => ({ id: a.id, name: a.name, role: a.role, does: a.does, tools: a.tools, brief: a.brief || '', skills: skills.names(a), department: a.department, lead: a.lead }));
+const agentsOut = () => { const setup = setupMap(); return AGENTS.map(a => ({ id: a.id, name: a.name, role: a.role, does: a.does, tools: a.tools, brief: a.brief || '', skills: skills.names(a), lessons: learn.count(BRAIN, a.id), department: a.department, lead: a.lead,
+  interviewer: leadOf(a.department).id === a.id, setUp: setup[a.department] })); };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
@@ -219,9 +235,10 @@ const server = http.createServer(async (req, res) => {
       return res.end(url.pathname === '/dark' ? page.replace('<body>', '<body class="dark">') : page); // /dark: the same file, opened in dark mode
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, version, backend, model: cfg.model || (sdk ? 'claude-opus-5' : 'your Claude Code default'), name: cfg.name, brain: BRAIN, notes: graph.notes, depts: DEPT_KEYS,
-      agents: agentsOut(), roster: { customised: roster.customised, briefed: roster.briefed, files: roster.files, problems: roster.problems }, skills: (({ count, shipped, brain, problems }) => ({ count, shipped, brain, problems }))(skills.summary()), tools: backend === 'claude-cli', mcp: mcp.summary() });
+      agents: agentsOut(), setup: setupMap(), roster: { customised: roster.customised, briefed: roster.briefed, files: roster.files, problems: roster.problems }, skills: (({ count, shipped, brain, problems }) => ({ count, shipped, brain, problems }))(skills.summary()), tools: backend === 'claude-cli', mcp: mcp.summary() });
     if (url.pathname === '/api/agents') return json(res, 200, { agents: agentsOut(), problems: roster.problems, files: roster.files });
     if (url.pathname === '/api/skills') return json(res, 200, refreshSkills().summary()); // reloads from disk: edit a skill, hit this, see it
+    if (url.pathname === '/api/lessons') return json(res, 200, { dir: learn.dir(BRAIN), agents: AGENTS.map(a => ({ id: a.id, name: a.name, ...learn.read(BRAIN, a.id) })).filter(x => x.rules.length || x.oneOffs.length) });
     if (url.pathname === '/api/mcp') { if (url.searchParams.get('refresh') === '1') await mcp.discover(); else await discovering; return json(res, 200, { ...mcp.summary(), tools: backend === 'claude-cli' }); }
     if (url.pathname === '/api/brain') return json(res, 200, graph);
     if (url.pathname === '/api/tasks' && req.method === 'GET') return json(res, 200, load());
@@ -251,14 +268,27 @@ const server = http.createServer(async (req, res) => {
       }
       const l2 = load(); const i = l2.findIndex(t => t.id === task.id); if (i >= 0) l2[i] = task; save(l2);
       console.log(`${task.error ? '✗' : '✓'} ${task.id} ${task.error ? 'failed' : 'done'} (${task.result.length} chars${task.tools?.length ? ', tools: ' + task.tools.join(' ') : ''}${task.note ? ', note: ' + task.note : ''})`);
-      return json(res, 200, task);
+      json(res, 200, task);
+      if (feedback && !task.error) { // learn from the correction, after the reply is out the door
+        const a = AGENTS.find(x => x.id === task.agent);
+        learn.classify(ask, a, task, feedback).then(v => { const r = learn.record(BRAIN, a, task, feedback, v); console.log(`  ↳ ${a.name} ${r.standing ? 'learned a rule' : 'noted a one-off'}: ${r.line.slice(0, 100)}`); })
+          .catch(e => console.warn('learn:', e.message));
+      }
+      return;
     }
     if (m && req.method === 'DELETE') { save(load().filter(t => t.id !== m[1])); return json(res, 200, { ok: true }); }
     if (url.pathname === '/api/chat' && req.method === 'POST') {
       const { agent, text, history } = await body(req);
       if (!text || !String(text).trim()) return json(res, 400, { error: 'empty message' });
+      const a = AGENTS.find(x => x.id === agent); if (!a) return json(res, 400, { error: 'unknown agent' });
+      if (leadOf(a.department).id === a.id) { // the department lead can run the set-up interview
+        refreshSkills();
+        const o = await onboard.handle(String(text).trim(), { dept: a.department, deptName: DEPTS[a.department].name, lead: a, agents: AGENTS.filter(x => x.department === a.department),
+          connected: mcp.summary().servers?.filter(x => x.status === 'connected').map(x => x.name || x.key) || [], brainPath: BRAIN, dataDir: DATA, ask, business: cfg.name, afterWrite: refreshSkills });
+        if (o) { if (o.wrote) console.log(`★ ${a.name} set up ${DEPTS[a.department].name}: ${o.wrote.briefs.length} briefs${o.wrote.skill ? ', skill ' + o.wrote.skill.name : ''}`); return json(res, 200, { reply: o.reply, read: [], tools: [], interview: !o.wrote, setup: setupMap() }); }
+      }
       const r = await chat(agent, String(text).trim(), history);
-      return json(res, 200, r);
+      return json(res, 200, { ...r, interview: false });
     }
     json(res, 404, { error: 'not found' });
   } catch (e) { console.error(e); json(res, 500, { error: e.message }); }
@@ -268,6 +298,7 @@ server.listen(cfg.port, () => {
   console.log(`  business: ${cfg.name}   brain: ${BRAIN} (${graph.notes} notes, ${graph.links.length} links)   claude: ${backend}${cfg.model ? ' · ' + cfg.model : ''}`);
   console.log(`  tasks: ${FILE}   notes the agents write: ${NOTES_DIR}`);
   console.log(`  agents: 33 (${roster.customised} customised${roster.briefed ? ', ' + roster.briefed + ' briefed' : ''}${roster.files.length ? ' via ' + roster.files.join(' + ') : ''})   tools: ${backend === 'claude-cli' ? 'connected MCP servers' + (cfg.tools?.web === false ? '' : ' + web') : 'none on the API backend'}`);
-  const sk = skills.summary();
+  const sk = skills.summary(); const setup = setupMap(); const notYet = DEPT_KEYS.filter(k => !setup[k]);
   console.log(`  skills: ${sk.count} (${sk.shipped} shipped in skills/, ${sk.brain} in ${path.join(NOTES_DIR, 'skills')})${sk.problems.length ? '   ⚠ ' + sk.problems.length + ' problem' + (sk.problems.length > 1 ? 's' : '') + ' — see npm run check' : ''}`);
+  console.log(`  set up: ${notYet.length === DEPT_KEYS.length ? 'no department yet — open a lead\'s chat and say "set up"' : notYet.length ? DEPT_KEYS.length - notYet.length + ' of 6 departments (not yet: ' + notYet.map(k => DEPTS[k].name).join(', ') + ')' : 'all six departments'}   lessons: ${learn.dir(BRAIN)}`);
 });

@@ -143,9 +143,28 @@ claude
   shape as a template, the rules I follow, and keep this one as the example.
 ```
 
-Skills take effect on the next task, no restart. `npm run check` validates them and
+Skills and briefs take effect on the next task, no restart. `npm run check` validates them and
 http://localhost:4520/api/skills shows who has what. The full guide, including what the agent
 sees and how to write a good one, is **[SKILLS.md](SKILLS.md)**.
+
+### Or let the lead interview you
+
+Click a department lead and say **set up**. The lead asks five questions, one at a time: what
+the department does here, the job you do most, what a good result looks like, what must never
+happen, which tools and people are involved. Then it writes a brief for each agent on its team
+and a skill for the job you described, into your brain, and tells you exactly what it wrote and
+one task to type to try it. Nothing is written until the last answer. "skip", "done" and
+"cancel" do what they say. A lead whose department has nothing of yours yet offers this in its
+greeting.
+
+### They learn from your corrections
+
+Send a deliverable back with `revise: …` in the agent's chat and the correction is recorded in
+`<brain>/Agents Office/feedback/<agent>.md`. Claude sorts it: a one-off about that task, or a
+standing rule ("proposals are always one page") that the agent then applies to every task from
+then on. The file is plain Markdown and it is yours: reword a rule, delete a line to unlearn it,
+move a one-off up to make it a rule. When a rule is really a process, ask Claude Code to fold it
+into the skill.
 
 ## Make it yours
 
@@ -199,6 +218,8 @@ first thing to run after any change.
 | `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
 | `roster.mjs` · `office.agents.json` | The 33 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |
 | `skills.mjs` · `skills/` | Skills: how a kind of work is done, bound to agents or departments (`<brain>/Agents Office/skills/` is yours) |
+| `learn.mjs` | Corrections from `revise: …` recorded per agent in `<brain>/Agents Office/feedback/`; standing rules go back into the prompt |
+| `onboard.mjs` | The lead's five-question set-up interview; writes briefs and a skill into the brain |
 | `SKILLS.md` | The guide to briefs and skills |
 | `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, or change connectors in this folder |
 | `graph-build.mjs` | Reads your brain folder and lays out the graph |
@@ -209,7 +230,7 @@ first thing to run after any change.
 
 Your notes are read from disk and sent to Claude only as context for the task or chat at hand
 (a handful of the most relevant notes, plus your brain's `CLAUDE.md` and `index.md` if present,
-plus the agent's brief and skills).
+plus the agent's brief, skills and standing rules from your corrections).
 When an agent calls a connector, that call goes to that service through your own Claude Code
 login, exactly as it would if you called it yourself. Nothing else leaves your machine.
 Deliverables are saved locally.

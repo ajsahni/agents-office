@@ -27,7 +27,8 @@ Add a `brief` to any agent. It is read before every task and every chat turn.
 ] }
 ```
 
-A brief can be a list of lines instead of one string. Restart the office after changing briefs.
+A brief can be a list of lines instead of one string. Briefs are re-read before every task, so
+there is nothing to restart.
 
 ## Skills
 
@@ -85,6 +86,49 @@ sample studio; a skill of the same name in your brain replaces the shipped one.
 turn. `npm run check` validates them; http://localhost:4520/api/skills shows what is loaded and
 who has what.
 
+## Let the lead interview you
+
+The fastest way to a first brief and skill is to have the department lead ask. Click a lead (the
+starred desk in each pod; where a department has no lead, its first agent does this), and say
+**set up**. Five questions, one at a time:
+
+1. What does this department do here, in your words? What comes in, what goes out, for whom?
+2. The one job you do most often, start to finish.
+3. What a good result looks like. Paste one you were happy with, or describe the sections.
+4. What must never happen. Red lines, things that always wait for you.
+5. Which tools and people are involved.
+
+Answer in plain words. "skip" skips a question, "done" finishes early, "cancel" throws the
+answers away. Nothing is written until the last answer. Then the lead writes:
+
+- a **brief** for each agent on its team that the answers touched, into
+  `<brain>/Agents Office/agents.json`, merged with whatever is already there;
+- one **skill** for the job you described, into `<brain>/Agents Office/skills/<name>/`, with a
+  `template.md` if you gave it a shape;
+
+and replies with what it wrote, where, and one task to type to try it. Everything it writes is
+an ordinary file you can edit. Run it again any time; briefs are replaced, and an existing skill
+of the same name is kept beside the new one as a backup. A lead whose department has nothing of
+yours yet says so in its greeting and offers the interview.
+
+## They learn from your corrections
+
+When you send a deliverable back with `revise: …` in the chat, the agent revises it, and the
+correction is written to `<brain>/Agents Office/feedback/<agent-id>.md`. Claude sorts each one:
+
+- a **one-off**: about that task, that client, that draft ("add the booking integration");
+- a **standing rule**: something you will want every time ("too long, proposals are one page"
+  becomes *Keep every proposal to one page*).
+
+Standing rules are read by that agent before every task and chat turn, newest last, the most
+recent fifteen. The file is plain Markdown with two sections, "Standing rules" and "One-offs",
+one line each. It is yours: reword a rule, delete a line to unlearn it, move a one-off up to
+promote it. http://localhost:4520/api/lessons shows what every agent has learned.
+
+Lessons are for preferences. When a rule turns into a process with steps and a shape, it
+belongs in a skill: open Claude Code in this folder and say "fold the Proposals agent's lessons
+into the proposal skill".
+
 ## What the agent sees
 
 For a task, the agent's instructions are assembled in this order:
@@ -92,9 +136,10 @@ For a task, the agent's instructions are assembled in this order:
 1. Who it is: name, role, what it does.
 2. Its brief, if it has one.
 3. Every skill bound to it, in full, with the files beside each one.
-4. The tools it may call.
-5. Your brain's `CLAUDE.md`, `index.md`, `business-model.md` and `voice.md`, if present.
-6. The notes it picked for this task.
+4. Its standing rules from your corrections.
+5. The tools it may call.
+6. Your brain's `CLAUDE.md`, `index.md`, `business-model.md` and `voice.md`, if present.
+7. The notes it picked for this task.
 
 A skill or a brief overrides the default shape (short, under 260 words). The deliverable ends
 with a line naming the skill it followed, and the note saved in your brain records it in its
@@ -144,7 +189,8 @@ correction is one you will want every time, fold it into the skill.
 ## Checking it worked
 
 - `npm run check` lists every skill, who it is bound to, and every problem in plain sentences.
-- `npm start` prints the count at boot; http://localhost:4520/api/skills shows the detail.
+- `npm start` prints the count at boot and which departments are set up;
+  http://localhost:4520/api/skills shows the detail, `/api/lessons` the corrections.
 - Give the agent a task the skill covers. The deliverable ends with `Skill: <name>`.
 - Open the saved note in `<brain>/Agents Office/`. Its front matter has `skills:`.
 
