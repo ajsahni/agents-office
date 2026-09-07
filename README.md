@@ -130,7 +130,7 @@ every note they read, so your graph grows as the office works.
 | `G` | The Brain graph |
 | `C` | Chat with the department lead |
 | `X` | Send two agents to meet at the Brain |
-| `V` | Camera mode: a mid-grey backdrop for filming the screen |
+| `V` | Full screen view with dimmed lighting |
 | `D` | Dark mode. `command-centre-v2-dark.html` and http://localhost:4520/dark open in it |
 | `Esc` | Back |
 
