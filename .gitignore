@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/
 office.config.local.json
+office.agents.local.json
 brain/Agents Office/
 .DS_Store
 *.backup-*

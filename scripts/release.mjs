@@ -21,8 +21,8 @@ const push = process.argv.includes('--push');
 const OUT = path.join(ROOT, 'dist', 'release');
 
 const FILES = ['src', 'assets/mcp/tiles', 'assets/mcp/bake.py', 'assets/mcp/rebake.py', 'brain', 'scripts/release.mjs',
-  'build.mjs', 'graph-build.mjs', 'serve.mjs', 'config.mjs', 'check.mjs', 'setup', 'package.json', 'package-lock.json',
-  'office.config.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'assets/readme-hero.jpg'];
+  'build.mjs', 'graph-build.mjs', 'serve.mjs', 'config.mjs', 'mcp.mjs', 'roster.mjs', 'check.mjs', 'setup', 'package.json', 'package-lock.json',
+  'office.config.json', 'office.agents.json', 'CLAUDE.md', 'README.md', 'CHANGELOG.md', 'LICENSE', 'assets/readme-hero.jpg'];
 
 const run = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8', ...opts }); if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`); return r.stdout; };
 

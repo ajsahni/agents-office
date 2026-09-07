@@ -36,6 +36,30 @@ await step('build: graph has linked notes', async () => {
   return `${BRAIN.notes} notes · ${BRAIN.nodes.length} linked · ${BRAIN.links.length} links`;
 });
 
+/* ---------- 1b. the roster + the connector parser ---------- */
+await step('roster: office.agents.json validates', async () => {
+  const { loadRoster } = await import('./roster.mjs');
+  const r = loadRoster();
+  if (r.agents.length !== 33) throw new Error('agents: ' + r.agents.length);
+  if (r.problems.length) throw new Error(r.problems.join(' | '));
+  return `33 agents · ${r.customised} customised${r.files.length ? ' · ' + r.files.join(' + ') : ''}`;
+});
+await step('roster: bad edits are refused, not applied', async () => {
+  const { validate } = await import('./roster.mjs');
+  const r = validate({ agents: [{ id: 'newt', name: 'PODCAST NOTES', department: 'sales', lead: true, colour: 'red' }, { id: 'ghost', name: 'X' }] });
+  const n = r.agents.find(a => a.id === 'newt');
+  if (n.name !== 'PODCAST NOTES' || n.department !== 'marketing' || n.lead) throw new Error('validation let a fixed field through');
+  if (r.problems.length < 4) throw new Error('expected four problems, got ' + r.problems.length);
+});
+await step('connectors: claude mcp list parses', async () => {
+  const m = await import('./mcp.mjs');
+  const l = m.parseList('Checking MCP server health…\n\nclaude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - ✔ Connected\nclaude.ai Meta Ads: https://mcp.facebook.com/ads - ! Needs authentication\nplaywright: npx -y @playwright/mcp@latest - ✔ Connected');
+  if (l.length !== 3) throw new Error('parsed ' + l.length);
+  if (l[0].id !== 'claude_ai_Gmail' || l[0].key !== 'gmail' || l[0].status !== 'connected') throw new Error('gmail: ' + JSON.stringify(l[0]));
+  if (l[1].status !== 'needs-auth' || l[1].key !== 'meta') throw new Error('meta: ' + JSON.stringify(l[1]));
+  if (l[2].depts.length !== 2) throw new Error('playwright depts: ' + l[2].depts);
+});
+
 /* ---------- 2. offline smoke (Playwright) ---------- */
 let chromium = null;
 try { ({ chromium } = await import('playwright')); } catch { try { ({ chromium } = await import('playwright-core')); } catch {} }
@@ -108,6 +132,13 @@ else {
     ok('server: starts', `${up.name} · ${up.backend} · brain ${up.notes} notes`);
     await step('server: serves the office', async () => { const r = await fetch(base + '/'); const t = await r.text(); if (!/AGENTS OFFICE/.test(t)) throw new Error('html missing'); });
     await step('server: /api/brain has the live graph', async () => { const g = await (await fetch(base + '/api/brain')).json(); if (!g.nodes.length) throw new Error('empty'); return `${g.nodes.length} linked notes`; });
+    await step('server: /api/mcp lists this machine\'s connectors', async () => {
+      const m = await (await fetch(base + '/api/mcp')).json();
+      if (!Array.isArray(m.servers)) throw new Error('no servers array');
+      const c = m.servers.filter(s => s.status === 'connected').length;
+      return `${m.servers.length} servers · ${c} connected · agents get tools: ${m.tools ? 'yes' : 'no (API backend)'}${m.web ? ' + web' : ''}`;
+    });
+    await step('server: /api/health carries the roster', async () => { if (!Array.isArray(up.agents) || up.agents.length !== 33) throw new Error('agents: ' + (up.agents && up.agents.length)); if (!up.agents[0].does) throw new Error('no job description'); });
     await step('server: rejects an empty task', async () => { const r = await fetch(base + '/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"dept":"sales","text":""}' }); if (r.status !== 400) throw new Error('status ' + r.status); });
     if (LIVE) {
       await step('live: Claude routes a task', async () => {

@@ -153,6 +153,10 @@
   }
   #topconn img.in, #topmodels img.in { animation: none; opacity: 1; transform: none; }
   #topconn img.tpulse, #topmodels img.tpulse { animation: tpulse .6s var(--ease); opacity: 1; }
+  /* V3.1: a real server that is present but not usable — there, but grey, with a reason on hover */
+  #topconn img.off.in { opacity: .32; filter: grayscale(1); }
+  #topconn img.st-needs-auth.in { outline: 1.5px solid #E0A020; outline-offset: 1px; }
+  #topconn .tc-none { font-family: var(--ui); font-size: 9.5px; letter-spacing: .08em; color: var(--grey); white-space: nowrap; }
   @keyframes tcin { to { opacity: 1; transform: none; } }
   @keyframes tpulse {
     45% { transform: scale(1.38); filter: drop-shadow(0 0 9px rgba(46,139,87,.7)); }

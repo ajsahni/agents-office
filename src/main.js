@@ -8,6 +8,7 @@ import {
   makePerson, posePerson, poseWork, makePlant, makeServerRack, makeMeetingTable, makeWalkway, makeWarnSprite,
 } from './builders.js';
 import { initMcp } from './mcp.js';
+import { loadConnectors } from './connectors.js';
 import { initTasks } from './tasks.js';
 import { initBrain } from './brain.js';
 let tasks = null; // V3 task boards — initialised after the rail constants exist
@@ -246,8 +247,22 @@ for (const a of AGENTS) {
   };
 }
 
-/* CONNECTORS — per-dept dock of MCP logos with back-and-forth traffic (AJ's spec, 2 Aug rev 2) */
-const mcp = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R });
+/* CONNECTORS — per-dept dock of MCP logos with back-and-forth traffic (AJ's spec, 2 Aug rev 2)
+   V3.1: served, the list is the user's REAL MCP servers (GET /api/mcp) — the strip waits for it.
+   Opened as a file the demo list plays at once. `mcp` is a thin proxy so the rest of the office
+   never cares which it got. */
+let mcpImpl = null, mcpDark = false;
+const mcp = {
+  sprites: [],
+  tick: (...a) => mcpImpl && mcpImpl.tick(...a),
+  onAgentEvent: (...a) => mcpImpl && mcpImpl.onAgentEvent(...a),
+  onToolsUsed: (...a) => mcpImpl && mcpImpl.onToolsUsed(...a),
+  showTip: (...a) => mcpImpl && mcpImpl.showTip(...a),
+  startReveal: (...a) => mcpImpl && mcpImpl.startReveal(...a),
+  setDark: on => { mcpDark = on; if (mcpImpl) mcpImpl.setDark(on); },
+  isLive: () => !!(mcpImpl && mcpImpl.live),
+};
+loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); });
 
 // plants on outer corners
 for (const k of ['emails', 'sales', 'marketing', 'ops', 'delivery']) {
@@ -573,7 +588,7 @@ function ensureChat(id) {
     { who: 'agent', text: v.greeting },
     { who: 'work', i: '⏺', text: 'session attached — live work stream below' },
   ];
-  if (FILE_GEN[id]) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() });
+  if (FILE_GEN[id] && !(tasks && tasks.isLive())) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() }); // demo-only sample file; a live office shows real deliverables
 }
 function chatPush(id, msg) {
   ensureChat(id);
@@ -812,6 +827,7 @@ function sendChat(text) {
           const h = chatHist[id]; const k = h.findIndex(m => m.who === 'work' && m.text === `${r.a.name} is thinking`); if (k >= 0) h.splice(k, 1);
           chatPush(id, { who: 'agent', text: j.reply });
           if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
+          if (j.tools && j.tools.length) mcp.onToolsUsed(id, j.tools);
         })
         .catch(e => chatPush(id, { who: 'agent', text: `I couldn't reach Claude (${e.message}).` }));
       return;
@@ -1296,10 +1312,27 @@ function feedPush(r, i, text) {
   }
   if (modalOpen === r.a.id && modalTab === 'activity') renderActivity(r.a.id);
 }
+// V3.1 LIVE: the served roster (office.agents.json) renames the seats and rewrites what each
+// agent says about itself; the demo's fake greetings and stat chips are wrong in a real office
+function applyRoster(agents) {
+  if (!Array.isArray(agents)) return;
+  for (const a of agents) {
+    const r = R[a.id]; if (!r) continue;
+    r.a.name = a.name;
+    r.pill.innerHTML = (r.a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
+    r.v1 = r.v1 || {};
+    r.v1.role = a.role || r.v1.role || ''; r.v1.tagline = a.does || r.v1.tagline || '';
+    r.v1.greeting = `${a.does || 'I am ' + a.name + '.'} Give me a task in the bar on the right, or ask me something here.`;
+    r.v1.chips = ['What are you working on?', 'What can you do for me?', 'What tools can you use?'];
+    if (chatHist[a.id] && chatHist[a.id][0] && chatHist[a.id][0].who === 'agent') chatHist[a.id][0].text = r.v1.greeting;
+    if (modalOpen === a.id) openAgentRail(a.id, modalTab, false);
+  }
+}
 tasks = initTasks({
   hud, R, deptRT, RAIL_SIDE, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, esc,
   brainWrite: (id, title) => brain.write(id, title), brain,
-  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = 'BETA'; document.title = `${h.name} — Agents Office`; },
+  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = 'BETA'; document.title = `${h.name} — Agents Office`; applyRoster(h.agents); },
+  onTools: (agentId, keys) => mcp.onToolsUsed(agentId, keys),
   getFocused: () => focused, getZoom: () => view.zoom, getFocusDim: () => focusDim,
   toScreen: (p) => toScreen(p), reframe,
 });

@@ -4,11 +4,16 @@
 // packet traffic between tiles and desks so the connectors visibly help the agents work.
 // Real sim events fire a strong pulse + tile→desk beam + return ack; ambient exchanges keep
 // steady energy between events. Full brand colour · LOD small-out/full-in · click = tooltip.
+//
+// V3.1 (7 Sep 2026): the list is REAL when served — `connectors` (src/connectors.js) carries the
+// MCP servers the user's Claude Code is connected to, their status, which pods they feed, and
+// the roster's tool preferences; onToolsUsed() lights the wire an agent actually pulled on.
+// Opened as a file (no server) the demo list below still plays.
 import * as THREE from 'three';
 import { MCP_LOGOS, MCP_BY_DEPT } from './mcplogos.js';
 
 // agent → tools they'd plausibly be driving (falls back to any connector in the dept's dock)
-const AGENT_MCP = {
+export const AGENT_MCP = {
   // marketing
   ada: ['meta', 'clarity'], newt: ['beehiiv', 'loops'], gfx: ['canva'], iggy: ['canva', 'clarity'], riley: ['meta', 'beehiiv', 'clarity', 'notion'],
   vid: ['hyperframes', 'canva'],
@@ -51,7 +56,14 @@ const DOCKS = {
 
 function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 
-export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
+export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null }) {
+  const LIVE = !!(connectors && connectors.live);
+  const BY_DEPT = LIVE ? connectors.byDept : MCP_BY_DEPT;
+  const LOGOS = LIVE ? { ...MCP_LOGOS, ...connectors.logos } : MCP_LOGOS;
+  const AGENT_TOOLS = (LIVE && connectors.agentTools) || AGENT_MCP;
+  const STATUS = (LIVE && connectors.status) || {};
+  const NAMES = (LIVE && connectors.names) || {};
+
   const loader = new THREE.TextureLoader();
   const items = [];          // every connector tile
   const byDeptKey = {};      // `${dept}:${key}` -> item
@@ -83,7 +95,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     return dotTex[hex];
   }
 
-  for (const [dept, keys] of Object.entries(MCP_BY_DEPT)) {
+  for (const [dept, keys] of Object.entries(BY_DEPT)) {
     const L = LAYOUT[dept];
     const D = DOCKS[dept];
     const glowT = glowTexture(DEPTS[dept].chip);
@@ -91,7 +103,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
       L.pos[0] + D.dir.x * D.dist, D.h, L.pos[1] + D.dir.z * D.dist);
     byDept[dept] = [];
     keys.forEach((key, i) => {
-      const def = MCP_LOGOS[key];
+      const def = LOGOS[key];
       const tex = loader.load(def.img);
       tex.colorSpace = THREE.SRGBColorSpace;
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -141,8 +153,9 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
   // at overview all connector traffic originates from the top bar instead.
   // SHARED connectors (gmail: five depts; notion: every dept, V3.1) sit at the far RIGHT end
   // of the strip and each runs its OWN loom (below) instead of joining any dept's cluster/fan
-  const SHARED = { notion: '#151414', gmail: '#EA4335' };
-  const uniqKeys = [...new Set(Object.values(MCP_BY_DEPT).flat())].filter(k => !SHARED[k]);
+  const SHARED = LIVE ? connectors.shared : { notion: '#151414', gmail: '#EA4335' };
+  const uniqKeys = [...new Set(Object.values(BY_DEPT).flat())].filter(k => !SHARED[k]);
+  for (const k of ((LIVE && connectors.off) || [])) if (!uniqKeys.includes(k)) uniqKeys.push(k); // present but unusable: shown grey, never wired
   for (const k of Object.keys(SHARED)) uniqKeys.push(k);
   const topconn = document.getElementById('topconn');
   const topImgs = {};
@@ -150,14 +163,24 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     topconn.innerHTML = `<span class="tc-lab"><span class="dot"></span>CONNECTED TO</span>`;
     uniqKeys.forEach((k, i) => {
       const img = document.createElement('img');
-      img.src = MCP_LOGOS[k].img;
-      img.alt = img.title = MCP_LOGOS[k].name;
+      img.src = LOGOS[k].img;
+      img.alt = img.title = LOGOS[k].name;
+      if (STATUS[k] && STATUS[k] !== 'connected') { // real list: a server that is there but not usable
+        img.classList.add('off', 'st-' + STATUS[k]);
+        img.title = LOGOS[k].name + ' — ' + ({ 'needs-auth': 'needs authentication (run claude, then /mcp)', failed: 'failed to connect', pending: 'connecting…', denied: 'connected · blocked for agents in office.config.json' }[STATUS[k]] || STATUS[k]);
+      }
       img.style.setProperty('--d', (0.15 + i * 0.09) + 's'); // staggered pop-in on load
       img.addEventListener('animationend', (e) => { if (e.animationName === 'tcin') img.classList.add('in'); });
       img.addEventListener('click', () => fireConnector(k)); // presenter cue: click a logo → its dept(s) light up
       topconn.appendChild(img);
       topImgs[k] = img;
     });
+    if (LIVE && !uniqKeys.length) { // honest empty state — nothing is wired until the user connects something
+      const none = document.createElement('span');
+      none.className = 'tc-none';
+      none.textContent = 'nothing yet — connect in claude.ai or run: claude mcp add';
+      topconn.appendChild(none);
+    }
   }
 
   // cam + dockAcur are set every tick. At overview (dockAcur low) all connector traffic
@@ -179,7 +202,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
   hud.insertBefore(svg, hud.firstChild); // under every HUD overlay, above the 3D canvas
   const PORT_CORNER = { marketing: [-1, 1], emails: [-1, -1], sales: [1, -1], ops: [1, -1], fin: [1, -1], delivery: [-1, -1] };
   const wires = {}, wirePulses = [];
-  Object.keys(MCP_BY_DEPT).forEach((dept, ji) => {
+  Object.keys(BY_DEPT).forEach((dept, ji) => {
     const L = LAYOUT[dept], [cx, cz] = PORT_CORNER[dept];
     const path = document.createElementNS(svgNS, 'path');
     path.setAttribute('fill', 'none');
@@ -229,7 +252,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     jdot.setAttribute('fill', ink);
     svg.appendChild(jdot);
     const wiresOf = {};
-    Object.keys(MCP_BY_DEPT).filter(d => MCP_BY_DEPT[d].includes(key)).forEach(dept => {
+    Object.keys(BY_DEPT).filter(d => BY_DEPT[d].includes(key)).forEach(dept => {
       const L = LAYOUT[dept], [cx, cz] = PORT_CORNER[dept];
       const path = document.createElementNS(svgNS, 'path');
       path.setAttribute('fill', 'none');
@@ -260,8 +283,8 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     topmodels.innerHTML = `<span class="tc-lab"><span class="dot"></span>RUNS HEADLESS ON</span>`;
     Object.keys(MODELS).forEach((k, i) => {
       const img = document.createElement('img');
-      img.src = MCP_LOGOS[k].img;
-      img.alt = img.title = MCP_LOGOS[k].name + ' — headless';
+      img.src = LOGOS[k].img;
+      img.alt = img.title = LOGOS[k].name + ' — headless';
       img.style.setProperty('--d', (0.9 + i * 0.12) + 's');
       img.addEventListener('animationend', (e) => { if (e.animationName === 'tcin') img.classList.add('in'); });
       img.addEventListener('click', () => modelPulse(k, true));
@@ -310,7 +333,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
       if (f) {
         topconn.style.opacity = 1; topconn.style.visibility = 'visible';
         if (stripDept !== f) { // centre the strip and name the department it feeds
-          for (const [k, img] of Object.entries(topImgs)) img.style.display = MCP_BY_DEPT[f].includes(k) ? '' : 'none';
+          for (const [k, img] of Object.entries(topImgs)) img.style.display = BY_DEPT[f].includes(k) ? '' : 'none';
           topconn.classList.add('focus');
           topconn.querySelector('.tc-lab').innerHTML =
             `<span class="dot" style="background:${DEPTS[f].chip}"></span>${DEPTS[f].short} · CONNECTED TO`;
@@ -338,7 +361,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
       // branch fan: one drop per logo → junction under the cluster; trunk: junction → port.
       // junction depths are staggered per dept so neighbouring fans don't overlap.
       // gmail is EXCLUDED from every fan — it feeds the junctions via its own loom below
-      const xs = MCP_BY_DEPT[dept].filter(k => !SHARED[k]).map(k => {
+      const xs = BY_DEPT[dept].filter(k => !SHARED[k]).map(k => {
         const r = topImgs[k].getBoundingClientRect();
         return (r.left + r.right) / 2;
       });
@@ -433,7 +456,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
 
   function fireConnector(key) {
     const now = performance.now();
-    for (const [dept, keys] of Object.entries(MCP_BY_DEPT)) {
+    for (const [dept, keys] of Object.entries(BY_DEPT)) {
       if (!keys.includes(key)) continue;
       const item = byDeptKey[dept + ':' + key];
       const seats = docks[dept].seats;
@@ -539,8 +562,8 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
   // an agent did real work → their connector lights up, ships a packet train to the desk,
   // and the desk answers with a return train — visible request/response
   function onAgentEvent(agentId, dept, seatPos, now) {
-    const prefs = (AGENT_MCP[agentId] || []).filter(k => byDeptKey[dept + ':' + k]);
-    const dock = MCP_BY_DEPT[dept] || [];
+    const prefs = (AGENT_TOOLS[agentId] || []).filter(k => byDeptKey[dept + ':' + k]);
+    const dock = BY_DEPT[dept] || [];
     if (!dock.length) return;
     const key = prefs.length ? prefs[Math.floor(Math.random() * prefs.length)]
                              : dock[Math.floor(Math.random() * dock.length)];
@@ -549,6 +572,24 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     pulse(item, now, 0.3);
     spawnBeam(item, seatPos, now);                                   // tile → desk
     spawnBeam(item, seatPos, now, { reverse: true, count: 3, delay: 850, scale: 0.85 }); // desk → tile ack
+  }
+
+  // LIVE: an agent really called these tools → their logos pulse and the exchange rides the
+  // wire into that agent's pod (keys as the server gives them: logo key, server id, or 'web')
+  function onToolsUsed(agentId, keys) {
+    const r = R[agentId]; if (!r || !Array.isArray(keys)) return;
+    keys.forEach((key, i) => setTimeout(() => {
+      const t = performance.now();
+      if (key === 'web') { modelPulse('claude', true); return; }
+      const item = byDeptKey[r.a.dept + ':' + key] || items.find(it => it.key === key);
+      if (!item) return;
+      pulse(item, t, 0.3);
+      if (item.dept === r.a.dept) {
+        spawnBeam(item, r.seat, t, { count: 3 });
+        spawnBeam(item, r.seat, t, { reverse: true, count: 2, delay: 650, scale: 0.8 });
+      } else wirePulse(item.dept, { shared: SHARED[key] ? key : null });
+      if (byDeptKey[r.a.dept + ':' + key] === undefined && SHARED[key]) wirePulse(r.a.dept, { shared: key });
+    }, i * 420));
   }
 
   // click tooltip
@@ -562,7 +603,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     if (!item) return;
     pulse(item, now, 0.3);
     const idle = Math.max(0, Math.round((now - item.lastActive) / 1000));
-    tip.innerHTML = `<b>${item.name}</b> MCP<br><span class="t-live">● connected</span> · ` +
+    tip.innerHTML = `<b>${item.name}</b> MCP<br><span class="t-live">● ${STATUS[item.key] || 'connected'}</span> · ` +
       `${DEPTS[item.dept].short.toLowerCase()} · ${idle < 2 ? 'active now' : 'active ' + idle + 's ago'}`;
     tip.style.left = Math.min(x + 14, innerWidth - 190) + 'px';
     tip.style.top = (y - 10) + 'px';
@@ -591,7 +632,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
     if (volleyAt && now > volleyAt) {
       const go = !focused;
       volleyAt = 0;
-      if (go) Object.keys(MCP_BY_DEPT).forEach((dept, i) => setTimeout(() => {
+      if (go) Object.keys(BY_DEPT).forEach((dept, i) => setTimeout(() => {
         const its = byDept[dept], seats = docks[dept].seats;
         if (!its.length || !seats.length) return;
         const item = its[Math.floor(Math.random() * its.length)];
@@ -676,12 +717,16 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R }) {
   }
 
   // dark mode: the two ink-coloured looms (Notion, ChatGPT) would vanish on a dark ground
+  const inkBlack = new Set(Object.keys(SHARED).filter(k => SHARED[k] === '#151414'));
   function setDark(on) {
     const ink = on ? '#E8E6DF' : '#151414';
-    SHARED.notion = ink; MODELS.chatgpt = ink;
-    const sh = shared.notion;
-    if (sh) { sh.ink = ink; sh.drop.setAttribute('stroke', ink); sh.jdot.setAttribute('fill', ink); for (const g of Object.values(sh.wires)) { g.path.setAttribute('stroke', ink); g.dot.setAttribute('fill', ink); } }
+    MODELS.chatgpt = ink;
+    for (const k of inkBlack) {
+      SHARED[k] = ink;
+      const sh = shared[k];
+      if (sh) { sh.ink = ink; sh.drop.setAttribute('stroke', ink); sh.jdot.setAttribute('fill', ink); for (const g of Object.values(sh.wires)) { g.path.setAttribute('stroke', ink); g.dot.setAttribute('fill', ink); } }
+    }
     if (mwires.chatgpt) { mwires.chatgpt.path.setAttribute('stroke', ink); mwires.chatgpt.dot.setAttribute('fill', ink); }
   }
-  return { tick, sprites: [], onAgentEvent, showTip, startReveal, setDark }; // sprites: none clickable — docks retired
+  return { tick, sprites: [], onAgentEvent, onToolsUsed, showTip, startReveal, setDark, live: LIVE, keys: uniqKeys }; // sprites: none clickable — docks retired
 }

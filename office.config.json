@@ -2,5 +2,7 @@
   "name": "Northgate Studio",
   "brain": "./brain",
   "port": 4520,
-  "model": ""
+  "model": "",
+  "mcp": { "allow": [], "deny": [], "departments": {} },
+  "tools": { "web": true }
 }

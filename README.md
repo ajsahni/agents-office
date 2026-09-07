@@ -6,8 +6,9 @@ A 3D isometric office where AI agents do real work on your own Claude login.
 
 Six departments, thirty-three agents at their desks, a task bar that routes what you type to the
 right agent, and a Brain at the centre that is your own folder of notes. Type a task, the office
-gives it to the right person, they read your notes, do the work, and file the result back into
-your notes. Everything runs on your machine.
+gives it to the right person, they read your notes, use the connectors you have already set up
+in Claude Code, do the work, and file the result back into your notes. Everything runs on your
+machine.
 
 **Beta.** It works end to end. Expect rough edges and tell us about them in Issues.
 
@@ -43,6 +44,62 @@ Without `./setup`: `npm install && node build.mjs && npm start`.
    Say `revise: make it shorter` and they rework their last deliverable.
 4. Press **G**, or click the Brain, to open your notes as a graph. Hover a note to see its links,
    click it to read where it sits and who read or wrote it.
+5. The top bar shows the connectors your Claude Code is connected to. When an agent uses one,
+   its logo pulses and the wire into that department lights up.
+
+## Connectors
+
+The bar under **CONNECTED TO** is real: it is the list from `claude mcp list` on this machine,
+which is the same list the agents get as tools. Gmail, Slack, Notion, Google Drive, Canva,
+whatever you have connected in claude.ai or added with `claude mcp add`. A server that needs
+authentication shows grey with the reason on hover, and is not wired to any pod until it works.
+Nothing connected yet? The bar says so.
+
+Agents can call those servers while they work, plus web search. They never get Bash, file
+tools or sub-agents. Their standing rule: read freely; send, post, pay, delete or change
+anything outside this machine **only** when your task explicitly asks for that exact action.
+A finished deliverable says which tools it used, and the note in your brain records them.
+
+Decide what the agents may touch in `office.config.json`:
+
+```json
+"mcp": { "allow": [], "deny": ["Stripe"], "departments": { "Slack": ["emails", "ops"] } },
+"tools": { "web": true }
+```
+
+`allow` empty means every connected server. `deny` keeps a server in the bar but out of the
+agents' hands. `departments` says which pods a server is wired to (known brands have a default;
+anything else feeds every pod). Set `tools.web` to `false` to keep the agents off the web.
+Tool use needs the Claude Code login; on an `ANTHROPIC_API_KEY` the agents write from your notes only.
+
+## Make the agents yours
+
+The 33 agents are in `office.agents.json`: an id, a department, a name, a role, what they do,
+and the connectors they usually use. Change the name, the role, what they do and their tools.
+Departments, leads and seats are fixed: six pods, 33 desks, that is the office. A new kind of
+agent is a renamed seat in the right department.
+
+The easy way is to let Claude do it. Open Claude Code in this folder and say what you want:
+
+```
+claude
+> Rename the Newsletter agent to PODCAST NOTES. It turns each episode into show notes and a LinkedIn post, and uses Google Drive.
+> Make the Sales department about wholesale accounts, not inbound leads. Rewrite what each agent does.
+> Tell every Finance agent to use Xero and nothing else.
+```
+
+Claude reads `CLAUDE.md`, writes your changes to `office.agents.local.json` (yours, ignored by
+git, so `git pull` never overwrites it), and validates them with `npm run check`. Restart the
+office and the desks carry the new names. Edit the file by hand if you prefer; the shape is:
+
+```json
+{ "agents": [
+  { "id": "newt", "name": "PODCAST NOTES", "role": "Podcast Notes Agent",
+    "does": "Turns each episode into show notes and a LinkedIn post.", "tools": ["google drive"] }
+] }
+```
+
+Edits to `id`, `department` or `lead` are ignored, and the server says so at start.
 
 ## Make it yours
 
@@ -93,6 +150,9 @@ first thing to run after any change.
 |---|---|
 | `src/` | The office: `main.js` scene, `tasks.js` task panel, `brain.js` the Brain, `mcp.js` connectors, `data.js` departments and roster, `v1data.js` agent personalities |
 | `serve.mjs` | The local server: routing, deliverables, chat, the live Brain graph |
+| `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
+| `roster.mjs` · `office.agents.json` | The 33 agents: names, roles, what they do, their tools (`office.agents.local.json` overrides) |
+| `CLAUDE.md` | What Claude Code does when you ask it to change agents or connectors in this folder |
 | `graph-build.mjs` | Reads your brain folder and lays out the graph |
 | `brain/` | The sample brain |
 | `data/tasks.json` | Your tasks (created on first run, ignored by git) |
@@ -101,4 +161,6 @@ first thing to run after any change.
 
 Your notes are read from disk and sent to Claude only as context for the task or chat at hand
 (a handful of the most relevant notes, plus your brain's `CLAUDE.md` and `index.md` if present).
-Nothing else leaves your machine. Deliverables are saved locally.
+When an agent calls a connector, that call goes to that service through your own Claude Code
+login, exactly as it would if you called it yourself. Nothing else leaves your machine.
+Deliverables are saved locally.

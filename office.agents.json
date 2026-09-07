@@ -1,0 +1,393 @@
+{
+  "_about": "The 33 agents of your office. Change name, role, does and tools freely; id, department and lead are fixed (six pods, 33 seats). Put personal edits in office.agents.local.json (gitignored) so git pull never overwrites them. Ask Claude Code in this folder to change agents for you — see CLAUDE.md.",
+  "agents": [
+    {
+      "id": "elead",
+      "department": "emails",
+      "lead": true,
+      "name": "EMAILS LEAD",
+      "role": "Inbox Lead",
+      "does": "Runs the whole inbox: routes every email to the right desk, checks tone, and escalates only what needs AJ.",
+      "tools": [
+        "gmail",
+        "notion"
+      ]
+    },
+    {
+      "id": "cmail",
+      "department": "emails",
+      "lead": false,
+      "name": "CLIENT EMAILS",
+      "role": "Client Email Agent",
+      "does": "Answers every client email from the Brain — scope, timelines, results — and never lets one sit past an hour.",
+      "tools": [
+        "gmail"
+      ]
+    },
+    {
+      "id": "imail",
+      "department": "emails",
+      "lead": false,
+      "name": "INTERNAL EMAILS",
+      "role": "Internal Email Agent",
+      "does": "Keeps the team inbox moving — triage, summaries of long threads, calendar holds, and the weekly numbers circulated.",
+      "tools": [
+        "gmail",
+        "notion"
+      ]
+    },
+    {
+      "id": "vmail",
+      "department": "emails",
+      "lead": false,
+      "name": "VENDOR EMAILS",
+      "role": "Vendor Email Agent",
+      "does": "Handles every supplier thread — quotes, renewals, SLAs, outages — and flags anything that changes what we pay.",
+      "tools": [
+        "gmail"
+      ]
+    },
+    {
+      "id": "kmail",
+      "department": "emails",
+      "lead": false,
+      "name": "CONTRACTOR EMAILS",
+      "role": "Contractor Email Agent",
+      "does": "Talks to the freelancers — briefs out, hours in, invoice questions answered against the contract.",
+      "tools": [
+        "gmail"
+      ]
+    },
+    {
+      "id": "lexi",
+      "department": "sales",
+      "lead": true,
+      "name": "SALES LEAD",
+      "role": "Sales Team Lead Agent",
+      "does": "Runs the sales team — five agents report to it — and it owns the reps’ call lists.",
+      "tools": [
+        "notion",
+        "gmail"
+      ]
+    },
+    {
+      "id": "enzo",
+      "department": "sales",
+      "lead": false,
+      "name": "LEAD ENRICHER",
+      "role": "Prospect Enrichment Agent",
+      "does": "Enriches every signup via FullEnrich — role, company size, mobile, LinkedIn.",
+      "tools": [
+        "fullenrich"
+      ]
+    },
+    {
+      "id": "ilm",
+      "department": "sales",
+      "lead": false,
+      "name": "INBOUND LEADS MANAGER",
+      "role": "Inbound Leads Manager",
+      "does": "Owns every lead that comes to us — qualifies it within the hour, routes the hot ones to a rep, books the calls.",
+      "tools": [
+        "gmail",
+        "imessage",
+        "fullenrich"
+      ]
+    },
+    {
+      "id": "pros",
+      "department": "sales",
+      "lead": false,
+      "name": "PROSPECTOR",
+      "role": "Outbound Prospecting Agent",
+      "does": "Builds fresh outbound lead lists to ICP spec — verified before anyone dials.",
+      "tools": [
+        "apollo",
+        "gmail"
+      ]
+    },
+    {
+      "id": "piper",
+      "department": "sales",
+      "lead": false,
+      "name": "PROPOSALS",
+      "role": "Proposal Agent",
+      "does": "Turns a deal brief into a proposal + send-ready email in minutes.",
+      "tools": [
+        "notion",
+        "gmail"
+      ]
+    },
+    {
+      "id": "folo",
+      "department": "sales",
+      "lead": false,
+      "name": "FOLLOW UPS",
+      "role": "Second-Touch & Revival Agent",
+      "does": "Chases everything that went quiet — unanswered calls, post-demo silence, stalled deals.",
+      "tools": [
+        "gmail",
+        "imessage"
+      ]
+    },
+    {
+      "id": "riley",
+      "department": "marketing",
+      "lead": false,
+      "name": "RESEARCH",
+      "role": "Daily Research Agent",
+      "does": "Scans the sales-tech industry and competitors every morning at 6am.",
+      "tools": [
+        "meta",
+        "beehiiv",
+        "clarity",
+        "notion"
+      ]
+    },
+    {
+      "id": "newt",
+      "department": "marketing",
+      "lead": false,
+      "name": "NEWSLETTER",
+      "role": "Newsletter Creator Agent",
+      "does": "Writes the monthly newsletter your signups actually open.",
+      "tools": [
+        "beehiiv",
+        "loops"
+      ]
+    },
+    {
+      "id": "gfx",
+      "department": "marketing",
+      "lead": false,
+      "name": "GRAPHICS DESIGNER",
+      "role": "Marketing Design Agent",
+      "does": "Designs everything marketing ships — ads, carousels, decks — on one brand kit.",
+      "tools": [
+        "canva"
+      ]
+    },
+    {
+      "id": "ada",
+      "department": "marketing",
+      "lead": false,
+      "name": "META ADS",
+      "role": "Meta Ads Agent",
+      "does": "Watches every campaign hourly; flags what to scale, kill or fix.",
+      "tools": [
+        "meta",
+        "clarity"
+      ]
+    },
+    {
+      "id": "iggy",
+      "department": "marketing",
+      "lead": false,
+      "name": "INSTAGRAM ORGANIC",
+      "role": "Instagram Organic Content Agent",
+      "does": "Runs the IG content engine — hooks, reels, carousels. Nothing posts without AJ.",
+      "tools": [
+        "canva",
+        "clarity"
+      ]
+    },
+    {
+      "id": "vid",
+      "department": "marketing",
+      "lead": false,
+      "name": "VIDEO EDITOR",
+      "role": "Video Editing Agent",
+      "does": "Cuts every video marketing ships — reels, ads, demos — rendered frame-perfect on HyperFrames.",
+      "tools": [
+        "hyperframes",
+        "canva"
+      ]
+    },
+    {
+      "id": "scout",
+      "department": "ops",
+      "lead": false,
+      "name": "INTEL",
+      "role": "Competitor & Industry Analysis Agent",
+      "does": "Turns Research’s raw findings into “here’s what we should do about it.”",
+      "tools": [
+        "notion"
+      ]
+    },
+    {
+      "id": "legal",
+      "department": "ops",
+      "lead": false,
+      "name": "LEGAL REVIEW",
+      "role": "Agreement Review Agent",
+      "does": "Reads every agreement before it goes out and gives it a second lens.",
+      "tools": [
+        "pandadoc",
+        "gmail"
+      ]
+    },
+    {
+      "id": "comply",
+      "department": "ops",
+      "lead": false,
+      "name": "COMPLIANCE CHECKER",
+      "role": "Regulatory Watch Agent",
+      "does": "Watches government and regulator sites daily and reports what changed.",
+      "tools": [
+        "notion",
+        "gmail"
+      ]
+    },
+    {
+      "id": "report",
+      "department": "ops",
+      "lead": false,
+      "name": "INTERNAL REPORTING",
+      "role": "Company Reporting Agent",
+      "does": "Builds the reports and keeps every company dashboard current.",
+      "tools": [
+        "gmail",
+        "notion"
+      ]
+    },
+    {
+      "id": "dash",
+      "department": "ops",
+      "lead": false,
+      "name": "INTERNAL DASHBOARDS",
+      "role": "Dashboards Agent",
+      "does": "Builds and keeps the internal dashboards honest — every tile traces to a number in the Brain, refreshed on schedule.",
+      "tools": [
+        "notion"
+      ]
+    },
+    {
+      "id": "alead",
+      "department": "fin",
+      "lead": true,
+      "name": "ACCOUNTING LEAD",
+      "role": "Accounting Lead Agent",
+      "does": "Runs the accounting team: Invoicing, Payables, Reconciliation report to it.",
+      "tools": [
+        "xero",
+        "gmail"
+      ]
+    },
+    {
+      "id": "invo",
+      "department": "fin",
+      "lead": false,
+      "name": "INVOICING",
+      "role": "Invoicing Agent",
+      "does": "Raises every invoice, chases every overdue — politely and relentlessly.",
+      "tools": [
+        "xero",
+        "stripe"
+      ]
+    },
+    {
+      "id": "apay",
+      "department": "fin",
+      "lead": false,
+      "name": "ACCOUNTS PAYABLE",
+      "role": "Accounts Payable Agent",
+      "does": "Audits every card charge and contractor invoice against what we actually agreed to pay.",
+      "tools": [
+        "xero"
+      ]
+    },
+    {
+      "id": "recon",
+      "department": "fin",
+      "lead": false,
+      "name": "RECONCILIATION",
+      "role": "Accounts Reconciliation Agent",
+      "does": "Matches every bank line to an invoice or bill. Unmatched = investigated.",
+      "tools": [
+        "stripe",
+        "xero"
+      ]
+    },
+    {
+      "id": "dlead",
+      "department": "delivery",
+      "lead": true,
+      "name": "DELIVERY LEAD",
+      "role": "Delivery Lead",
+      "does": "Owns every live project end to end — risk, timelines, staffing, handovers — and reports the state of play to AJ weekly.",
+      "tools": [
+        "notion",
+        "gmail"
+      ]
+    },
+    {
+      "id": "pco",
+      "department": "delivery",
+      "lead": false,
+      "name": "PROJECT CO-ORDINATOR",
+      "role": "Project Co-ordinator",
+      "does": "Keeps every project plan true — milestones, sign-offs, hours — and moves things before they become late.",
+      "tools": [
+        "notion"
+      ]
+    },
+    {
+      "id": "qa",
+      "department": "delivery",
+      "lead": false,
+      "name": "QUALITY ASSURANCE CHECKER",
+      "role": "QA Checker",
+      "does": "Nothing reaches a client until it passes: links, spelling, brand rules, numbers, the flows a client will actually click.",
+      "tools": [
+        "notion"
+      ]
+    },
+    {
+      "id": "crep",
+      "department": "delivery",
+      "lead": false,
+      "name": "CLIENT REPORTS",
+      "role": "Client Reports Agent",
+      "does": "Writes every client status and results report from the numbers in the Brain — same format, every month, on time.",
+      "tools": [
+        "pandadoc",
+        "notion"
+      ]
+    },
+    {
+      "id": "cass",
+      "department": "delivery",
+      "lead": false,
+      "name": "CLIENT ASSETS",
+      "role": "Client Assets Agent",
+      "does": "Every logo, file, export and final lives in the right place, named right, synced to the client portal.",
+      "tools": [
+        "canva",
+        "notion"
+      ]
+    },
+    {
+      "id": "dasst",
+      "department": "delivery",
+      "lead": false,
+      "name": "DESIGNER ASSISTANT",
+      "role": "Designer Assistant",
+      "does": "Takes the routine design work off the designer — templates, resizes, mockups, brand sheets — on brand, every time.",
+      "tools": [
+        "canva"
+      ]
+    },
+    {
+      "id": "ona",
+      "department": "delivery",
+      "lead": false,
+      "name": "ONBOARDER",
+      "role": "Onboarding Concierge (High-Usage)",
+      "does": "Texts high-usage new users and gets them set up like a human would.",
+      "tools": [
+        "gmail",
+        "notion"
+      ]
+    }
+  ]
+}
