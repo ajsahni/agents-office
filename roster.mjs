@@ -1,20 +1,24 @@
 // Agents Office — the roster (Beta). Who sits where is fixed (six pods, 33 seats); what each
 // agent is called, does and uses is yours to change in office.agents.json.
-//   built-in defaults  ← office.agents.json  ← office.agents.local.json (gitignored)
+//   built-in defaults  ← office.agents.json  ← <brain>/Agents Office/agents.json  ← office.agents.local.json (gitignored)
 // Departments, leads and seats cannot be changed from these files; the office ignores such
-// edits and says so. See CLAUDE.md for how to change agents with Claude Code.
+// edits and says so. `brief` is the owner's standing instructions to that agent (multi-line),
+// read before every task. Skills — how a kind of work is done — live beside the agents in
+// skills.mjs. See CLAUDE.md for how to change agents with Claude Code.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from './config.mjs';
+import { ROOT, loadConfig } from './config.mjs';
 import { AGENTS, DEPTS } from './src/data.js';
 import { V1 } from './src/v1data.js';
 
 export const FILE = path.join(ROOT, 'office.agents.json');
 export const LOCAL = path.join(ROOT, 'office.agents.local.json');
-const EDITABLE = ['name', 'role', 'does', 'tools'];
+export const brainFile = brainPath => path.join(brainPath, 'Agents Office', 'agents.json');
+const EDITABLE = ['name', 'role', 'does', 'tools', 'brief'];
+const BRIEF_MAX = 2000;
 
 export function defaults() {
-  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [] }; });
+  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [], brief: '' }; });
 }
 // returns { agents, problems } — problems are human sentences, never thrown
 export function validate(doc, base = defaults()) {
@@ -36,19 +40,26 @@ export function validate(doc, base = defaults()) {
     if (e.role !== undefined) a.role = String(e.role).trim().slice(0, 80);
     if (e.does !== undefined) a.does = String(e.does).trim().slice(0, 400);
     if (e.tools !== undefined) { if (!Array.isArray(e.tools)) problems.push(`"${e.id}": tools must be a list — ignored`); else a.tools = e.tools.map(String).map(s => s.trim()).filter(Boolean).slice(0, 12); }
+    if (e.brief !== undefined) { // a string, or a list of lines
+      const b = (Array.isArray(e.brief) ? e.brief.map(String).join('\n') : String(e.brief)).trim();
+      if (b.length > BRIEF_MAX) problems.push(`"${e.id}": brief is over ${BRIEF_MAX} characters — trimmed (put the long version in a skill)`);
+      a.brief = b.slice(0, BRIEF_MAX);
+    }
   }
   return { agents: out, problems };
 }
 function read(p) { if (!fs.existsSync(p)) return null; try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return { __error: e.message }; } }
-export function loadRoster() {
+export function loadRoster(brainPath = loadConfig().brainPath) {
   let agents = defaults(); const problems = [];
-  for (const p of [FILE, LOCAL]) {
+  const sources = [FILE, brainFile(brainPath), LOCAL];
+  const label = p => p === FILE || p === LOCAL ? path.basename(p) : 'brain/Agents Office/agents.json';
+  for (const p of sources) {
     const doc = read(p); if (!doc) continue;
-    const rel = path.basename(p);
+    const rel = label(p);
     if (doc.__error) { problems.push(`${rel}: not valid JSON (${doc.__error.split('\n')[0]}) — ignored`); continue; }
     const r = validate(doc, agents); agents = r.agents; problems.push(...r.problems.map(x => `${rel}: ${x}`));
   }
-  const customised = agents.filter((a, i) => { const d = defaults()[i]; return a.name !== d.name || a.role !== d.role || a.does !== d.does; }).length;
-  return { agents, problems, customised, files: [FILE, LOCAL].filter(p => fs.existsSync(p)).map(p => path.basename(p)) };
+  const customised = agents.filter((a, i) => { const d = defaults()[i]; return a.name !== d.name || a.role !== d.role || a.does !== d.does || a.brief; }).length;
+  return { agents, problems, customised, briefed: agents.filter(a => a.brief).length, files: sources.filter(p => fs.existsSync(p)).map(label) };
 }
 export const deptName = k => DEPTS[k]?.name || k;

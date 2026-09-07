@@ -1,6 +1,6 @@
 # Agents Office — for Claude Code
 
-You are in the Agents Office repo. The owner will most often ask you to change **who the agents are and what they do**, or to change **which connectors the agents may use**. Do that by editing the two JSON files below. Do not touch `src/`, `serve.mjs` or the build for those requests.
+You are in the Agents Office repo. The owner will most often ask you to change **who the agents are and what they do**, to teach an agent **how a kind of work is done** (a brief or a skill), or to change **which connectors the agents may use**. Do that by editing the JSON files and skill folders described below. Do not touch `src/`, `serve.mjs` or the build for those requests.
 
 ## Changing the agents
 
@@ -12,16 +12,67 @@ Each agent looks like:
 { "id": "newt", "department": "marketing", "lead": false,
   "name": "NEWSLETTER", "role": "Newsletter Creator Agent",
   "does": "Writes the monthly newsletter your signups actually open.",
-  "tools": ["beehiiv", "loops"] }
+  "tools": ["beehiiv", "loops"],
+  "brief": "Five bullets and a pull quote. Subject lines under 40 characters. Never open with the company name." }
 ```
 
-You may change **name, role, does, tools**. Keep `name` short and upper case (it is the label on the desk). `does` is what the agent reads about itself before every task, so write it as a job description in one or two sentences. `tools` names the connectors this agent usually reaches for (match the names shown in the top bar, lower case).
+You may change **name, role, does, tools, brief**. Keep `name` short and upper case (it is the label on the desk). `does` is what the agent reads about itself before every task, so write it as a job description in one or two sentences. `tools` names the connectors this agent usually reaches for (match the names shown in the top bar, lower case). `brief` is the owner's standing instructions to that one agent, read before every task and chat turn: up to 2,000 characters, a string or a list of lines. Anything longer, or anything with steps and a template, is a skill (next section).
+
+The roster is read in this order, later wins: `office.agents.json` → `<brain>/Agents Office/agents.json` → `office.agents.local.json`. The brain is the folder named by `brain` in `office.config.json` (or `office.config.local.json`, which wins). If the owner keeps their roster in the brain, write there instead of the local file.
 
 Fixed, and the office ignores edits to them: `id`, `department`, `lead`. There are **six departments and 33 seats** and that is the office. Do not add or remove agents, departments or pods. When the owner wants a new kind of agent, **rename a seat** in the right department. When they want fewer, leave the seat as is; an idle agent costs nothing.
 
 Department keys: `emails` (5 seats) · `sales` (6) · `marketing` (6) · `ops` (5) · `fin` (4) · `delivery` (7). The lead of each department stays the lead.
 
 After editing: run `npm run check` (it validates the roster and prints every problem), then tell the owner to restart the office (`npm start`). Names, roles and descriptions update on the next page load.
+
+## Teaching an agent how a task is done (skills)
+
+When the owner says "this is how we do X", "make the agent do it this way", "here is our SOP / template / an example I was happy with", or asks why the deliverables are generic, the answer is a **skill**. A skill is a folder with a `SKILL.md` and the files beside it, the same shape as a Claude Code skill. Full guide: `SKILLS.md`. Read it once before writing your first one.
+
+**Where to write it:** `<brain>/Agents Office/skills/<name>/SKILL.md`, where `<brain>` is the folder from `office.config.local.json` → `office.config.json` (`brain`, default `./brain`). Create the folders if they do not exist. Never write the owner's skills into the repo's `skills/` folder; that holds the shipped examples and `git pull` would fight them. A skill of the same name in the brain replaces a shipped one.
+
+**Decide brief or skill first.** Fits in a paragraph with no steps and no template → a `brief` on the agent. Has steps, a shape, rules, or a document to copy → a skill.
+
+**What you need before writing.** The trigger (which tasks this covers), the source material (an SOP, an example, the owner's description), the shape of the finished thing, and the rules. If the owner gave you a document, read it in full first. If one of these is missing, ask one question for it; do not invent the owner's process.
+
+**The folder:**
+
+```
+<brain>/Agents Office/skills/proposal/
+  SKILL.md       front matter + instructions (under 6,000 characters)
+  template.md    the shape of the finished thing, headings kept
+  example.md     one real one the owner was happy with (optional, strip anything private the owner did not hand you)
+```
+
+**SKILL.md:**
+
+```markdown
+---
+name: proposal
+description: How we write a client proposal
+agents: [piper]
+---
+# Writing a proposal
+Use this for any request that ends in a document a client says yes or no to.   ← the trigger, first line
+
+## Before you write
+1. …what to read first, by note name (`10-Business/offer-ladder.md`)…
+## The shape
+Follow `template.md` beside this file, section for section.
+## Rules
+- short, absolute, one per line
+```
+
+**Binding.** `agents: [id, id]` for one or more agents (ids from `office.agents.json`; pick the seat whose `does` matches, and say which one you chose). `departments: [emails]` for a whole department (`emails`, `sales`, `marketing`, `ops`, `fin`, `delivery`). Neither binds it to every agent; only do that for a house style, and say so. Unknown ids are refused and a skill with no valid binding is skipped.
+
+**Limits the loader enforces:** `SKILL.md` body 6,000 characters; each file beside it 4,000, all files together 8,000. Readable files are `.md .txt .csv .json .yaml .html`; anything else is listed by name only. Long reference material goes into the brain as ordinary notes, which the agent reads when the task calls for them; the skill just names them.
+
+**Writing rules.** The first line after the heading says when the skill applies. Steps, then shape, then rules. Point at notes by name. Rules are short and absolute. One skill per kind of work. Never put a number in a skill that should come from the numbers ledger; say where it comes from instead.
+
+**After writing:** run `npm run check` (it lists every skill, its binding and every problem in plain sentences; fix what is red). Skills take effect on the next task with no restart; a `brief` needs `npm start` again. Tell the owner: the folder path, which agent it is bound to, and one task to type to try it. Suggest they read the result and send it back with `revise: …` from the chat; when a correction is one they will want every time, fold it into the skill.
+
+**Reading skills back.** http://localhost:4520/api/skills (server running) or `node -e "import('./skills.mjs').then(async m=>console.log(JSON.stringify(m.loadSkills((await import('./config.mjs')).loadConfig().brainPath,(await import('./roster.mjs')).loadRoster().agents).summary(),null,1)))"`.
 
 ## Changing the connectors
 

@@ -15,6 +15,8 @@
 // V3.1: the connectors are real — the MCP servers your Claude Code is connected to are what the
 // top bar shows and what the agents can call (mcp.mjs); the roster is yours (office.agents.json,
 // roster.mjs). Tool calls only happen on the CLI backend: the SDK path has no MCP servers.
+// V3.2: how the work is done is yours too — each agent's `brief` (roster.mjs) and the skills
+// bound to it (skills.mjs: skills/ + <brain>/Agents Office/skills/) go into every task and chat.
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,6 +27,7 @@ import { layoutGraph, readVault, readOfficeNotes } from './graph-build.mjs';
 import { DEPTS, DEPT_KEYS } from './src/data.js';
 import * as mcp from './mcp.mjs';
 import { loadRoster } from './roster.mjs';
+import { loadSkills } from './skills.mjs';
 
 const cfg = loadConfig();
 const HTML = path.join(ROOT, 'command-centre-v2.html');
@@ -36,9 +39,12 @@ const CLI_CWD = path.join(os.tmpdir(), 'agents-office-cli'); // an empty cwd: no
 const version = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { return '?'; } })();
 const RUN_TIMEOUT = Math.max(60, +cfg.timeout || 300) * 1000; // agents with tools take longer than a plain draft
 mcp.configure(cfg);
-const roster = loadRoster();
-const AGENTS = roster.agents; // id · department · lead · name · role · does · tools
+const roster = loadRoster(BRAIN);
+const AGENTS = roster.agents; // id · department · lead · name · role · does · tools · brief
 for (const w of roster.problems) console.warn('agents:', w);
+let skills = loadSkills(BRAIN, AGENTS); // reloaded before every task and chat, so a new skill needs no restart
+for (const w of skills.problems) console.warn('skills:', w);
+const refreshSkills = () => { const s = loadSkills(BRAIN, AGENTS); if (s.problems.join() !== skills.problems.join()) for (const w of s.problems) console.warn('skills:', w); skills = s; return s; };
 
 let backend = 'claude-cli', sdk = null;
 if (process.env.ANTHROPIC_API_KEY) {
@@ -139,12 +145,16 @@ function contextText(index, names) {
 
 /* ---------- the roster, as Claude sees it ---------- */
 const persona = a => `${a.name}${a.lead ? ' (lead)' : ''} · ${a.role} · ${a.does}`;
-function rosterText(dept) { return AGENTS.filter(a => a.department === dept).map(a => `- ${a.id} · ${persona(a)}`).join('\n'); }
+function rosterText(dept) { return AGENTS.filter(a => a.department === dept).map(a => { const sk = skills.names(a); return `- ${a.id} · ${persona(a)}${sk.length ? ' · skills: ' + sk.join(', ') : ''}`; }).join('\n'); }
+// what an agent is told about itself: the job, the owner's standing instructions, the skills it follows
+function agentBrief(a) {
+  return (a.brief ? `\nSTANDING INSTRUCTIONS FROM THE OWNER\n${a.brief}\n` : '') + (skills.promptText(a) ? `\n${skills.promptText(a)}\n` : '');
+}
 const toolKeys = names => [...new Set(names.map(n => /^mcp__/.test(n) ? mcp.keyOf(n) : n === 'WebSearch' || n === 'WebFetch' ? 'web' : null).filter(Boolean))];
 async function route(dept, text) {
-  const d = DEPTS[dept];
+  const d = DEPTS[dept]; refreshSkills();
   const system = `You are the router for ${cfg.name}, a business whose departments are run by AI agents. ` +
-    'Pick the single best agent for the owner\'s request and return ONLY a JSON object — no prose, no code fences.';
+    'Pick the single best agent for the owner\'s request — an agent whose skills match the request is the right one — and return ONLY a JSON object — no prose, no code fences.';
   const user = `Department: ${d.name}\nAgents (id · name · role · what they do):\n${rosterText(dept)}\n\nOwner's request: "${text}"\n\n` +
     'Return: {"agent":"<id from the list>","title":"<clean imperative task title, max 70 characters>","plan":["<step>","<step>","<step>"],"eta_minutes":<integer>,"why":"<one short sentence>"}';
   const j = parseJSON(await ask(system, user, { maxTokens: 800, timeout: 150000 }));
@@ -155,35 +165,36 @@ async function route(dept, text) {
 }
 async function run(task, feedback) {
   const a = AGENTS.find(x => x.id === task.agent), d = DEPTS[a.department];
+  refreshSkills();
   const index = vaultIndex();
   const read = relevantNotes(index, a.department, task.title + ' ' + task.text);
-  const system = `You are ${a.name}, ${a.role || 'an agent'}, in the ${d.name} department of ${cfg.name}. ${a.does}\n` +
+  const system = `You are ${a.name}, ${a.role || 'an agent'}, in the ${d.name} department of ${cfg.name}. ${a.does}\n${agentBrief(a)}` +
     'Write the finished deliverable itself, not a description of what you would do. Plain text: a short heading, then short sections or bullets. ' +
-    'At most 260 words. No preamble, no sign-off. Ground it in the company notes below; where a fact is missing, make a reasonable assumption and mark it (assumed). ' +
+    'At most 260 words unless a skill or the owner\'s instructions set a different shape — those win. No preamble, no sign-off. Ground it in the company notes below; where a fact is missing, make a reasonable assumption and mark it (assumed). ' +
     'If you used a tool, say so in one line at the end ("Used: Gmail — searched the client thread").\n\n' +
     `${mcp.promptText(a.tools)}\n\nCOMPANY NOTES\n${businessContext(index)}\n\nNOTES YOU READ FOR THIS TASK\n${contextText(index, read)}`;
   const user = `Task: ${task.title}\nOwner's request: ${task.text}` + (task.plan?.length ? `\nAgreed plan: ${task.plan.join(' → ')}` : '') +
     (feedback ? `\n\nThe owner reviewed your previous version and asked for changes: "${feedback}"\nPrevious version:\n${task.result}` : '');
   const { text, tools } = await askX(system, user);
   if (!text) throw new Error('Claude returned nothing');
-  return { result: text, read, tools: toolKeys(tools), used: mcp.namesOf(tools) };
+  return { result: text, read, tools: toolKeys(tools), used: mcp.namesOf(tools), skills: skills.names(a) };
 }
 function writeNote(task) { // the deliverable becomes a note in the brain, linked to what was read
   fs.mkdirSync(NOTES_DIR, { recursive: true });
   const a = AGENTS.find(x => x.id === task.agent);
   const name = `${new Date(task.doneAt).toISOString().slice(0, 10)} ${slug(task.title)}`;
-  const body = `---\nagent: ${a.name}\ndepartment: ${DEPTS[a.department].name}\ntask: ${task.id}\ndone: ${new Date(task.doneAt).toISOString()}${task.used?.length ? '\ntools: ' + task.used.join(', ') : ''}\n---\n` +
+  const body = `---\nagent: ${a.name}\ndepartment: ${DEPTS[a.department].name}\ntask: ${task.id}\ndone: ${new Date(task.doneAt).toISOString()}${task.used?.length ? '\ntools: ' + task.used.join(', ') : ''}${task.skills?.length ? '\nskills: ' + task.skills.join(', ') : ''}\n---\n` +
     `# ${task.title}\n\n${task.result}\n\n---\nRead: ${(task.read || []).map(n => `[[${n}]]`).join(' · ') || '—'}\n`;
   fs.writeFileSync(path.join(NOTES_DIR, name + '.md'), body);
   return name;
 }
 async function chat(agentId, text, history) {
   const a = AGENTS.find(x => x.id === agentId); if (!a) throw new Error('unknown agent');
-  const d = DEPTS[a.department];
+  const d = DEPTS[a.department]; refreshSkills();
   const index = vaultIndex();
   const read = relevantNotes(index, a.department, text, 3);
   const mine = load().filter(t => t.agent === agentId).slice(-6).map(t => `- [${t.state}] ${t.title}`).join('\n');
-  const system = `You are ${a.name}, ${a.role || 'an agent'}, in the ${d.name} department of ${cfg.name}. ${a.does}\n` +
+  const system = `You are ${a.name}, ${a.role || 'an agent'}, in the ${d.name} department of ${cfg.name}. ${a.does}\n${agentBrief(a)}` +
     'You are talking to the owner. Answer as this agent, in first person, briefly (under 120 words unless asked for detail), plainly, no hype. ' +
     'Use the company notes; say when something is not in them. If the owner asks you to look something up, use your tools. Nothing outbound is sent without the owner\'s explicit say-so.\n\n' +
     `${mcp.promptText(a.tools)}\n\nCOMPANY NOTES\n${businessContext(index)}\n\nRELEVANT NOTES\n${contextText(index, read)}\n\nYOUR RECENT TASKS\n${mine || '—'}`;
@@ -198,7 +209,7 @@ const body = req => new Promise((resolve, reject) => { let s = ''; req.on('data'
 
 await rebuildGraph();
 const discovering = mcp.discover().then(l => { console.log(`  connectors: ${l.filter(s => s.status === 'connected').length} connected of ${l.length} (claude mcp list)`); return l; });
-const agentsOut = () => AGENTS.map(a => ({ id: a.id, name: a.name, role: a.role, does: a.does, tools: a.tools, department: a.department, lead: a.lead }));
+const agentsOut = () => AGENTS.map(a => ({ id: a.id, name: a.name, role: a.role, does: a.does, tools: a.tools, brief: a.brief || '', skills: skills.names(a), department: a.department, lead: a.lead }));
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
@@ -208,8 +219,9 @@ const server = http.createServer(async (req, res) => {
       return res.end(url.pathname === '/dark' ? page.replace('<body>', '<body class="dark">') : page); // /dark: the same file, opened in dark mode
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, version, backend, model: cfg.model || (sdk ? 'claude-opus-5' : 'your Claude Code default'), name: cfg.name, brain: BRAIN, notes: graph.notes, depts: DEPT_KEYS,
-      agents: agentsOut(), roster: { customised: roster.customised, files: roster.files, problems: roster.problems }, tools: backend === 'claude-cli', mcp: mcp.summary() });
+      agents: agentsOut(), roster: { customised: roster.customised, briefed: roster.briefed, files: roster.files, problems: roster.problems }, skills: (({ count, shipped, brain, problems }) => ({ count, shipped, brain, problems }))(skills.summary()), tools: backend === 'claude-cli', mcp: mcp.summary() });
     if (url.pathname === '/api/agents') return json(res, 200, { agents: agentsOut(), problems: roster.problems, files: roster.files });
+    if (url.pathname === '/api/skills') return json(res, 200, refreshSkills().summary()); // reloads from disk: edit a skill, hit this, see it
     if (url.pathname === '/api/mcp') { if (url.searchParams.get('refresh') === '1') await mcp.discover(); else await discovering; return json(res, 200, { ...mcp.summary(), tools: backend === 'claude-cli' }); }
     if (url.pathname === '/api/brain') return json(res, 200, graph);
     if (url.pathname === '/api/tasks' && req.method === 'GET') return json(res, 200, load());
@@ -230,8 +242,8 @@ const server = http.createServer(async (req, res) => {
       const { feedback } = m[2] === 'revise' ? await body(req) : {};
       task.state = 'doing'; task.startedAt = Date.now(); save(list);
       try {
-        const { result, read, tools, used } = await run(task, feedback);
-        Object.assign(task, { state: 'done', doneAt: Date.now(), result, read, tools, used, error: false });
+        const { result, read, tools, used, skills: sk } = await run(task, feedback);
+        Object.assign(task, { state: 'done', doneAt: Date.now(), result, read, tools, used, skills: sk, error: false });
         task.note = writeNote(task);
         await rebuildGraph();
       } catch (e) {
@@ -255,5 +267,7 @@ server.listen(cfg.port, () => {
   console.log(`Agents Office ${version} → http://localhost:${cfg.port}`);
   console.log(`  business: ${cfg.name}   brain: ${BRAIN} (${graph.notes} notes, ${graph.links.length} links)   claude: ${backend}${cfg.model ? ' · ' + cfg.model : ''}`);
   console.log(`  tasks: ${FILE}   notes the agents write: ${NOTES_DIR}`);
-  console.log(`  agents: 33 (${roster.customised} customised${roster.files.length ? ' via ' + roster.files.join(' + ') : ''})   tools: ${backend === 'claude-cli' ? 'connected MCP servers' + (cfg.tools?.web === false ? '' : ' + web') : 'none on the API backend'}`);
+  console.log(`  agents: 33 (${roster.customised} customised${roster.briefed ? ', ' + roster.briefed + ' briefed' : ''}${roster.files.length ? ' via ' + roster.files.join(' + ') : ''})   tools: ${backend === 'claude-cli' ? 'connected MCP servers' + (cfg.tools?.web === false ? '' : ' + web') : 'none on the API backend'}`);
+  const sk = skills.summary();
+  console.log(`  skills: ${sk.count} (${sk.shipped} shipped in skills/, ${sk.brain} in ${path.join(NOTES_DIR, 'skills')})${sk.problems.length ? '   ⚠ ' + sk.problems.length + ' problem' + (sk.problems.length > 1 ? 's' : '') + ' — see npm run check' : ''}`);
 });

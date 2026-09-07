@@ -1,5 +1,5 @@
 {
-  "_about": "The 33 agents of your office. Change name, role, does and tools freely; id, department and lead are fixed (six pods, 33 seats). Put personal edits in office.agents.local.json (gitignored) so git pull never overwrites them. Ask Claude Code in this folder to change agents for you — see CLAUDE.md.",
+  "_about": "The 33 agents of your office. Change name, role, does, tools and brief (standing instructions) freely; id, department and lead are fixed (six pods, 33 seats). Put personal edits in office.agents.local.json (gitignored) so git pull never overwrites them. Ask Claude Code in this folder to change agents for you — see CLAUDE.md.",
   "agents": [
     {
       "id": "elead",
@@ -7,7 +7,7 @@
       "lead": true,
       "name": "EMAILS LEAD",
       "role": "Inbox Lead",
-      "does": "Runs the whole inbox: routes every email to the right desk, checks tone, and escalates only what needs AJ.",
+      "does": "Runs the whole inbox: routes every email to the right desk, checks tone, and escalates only what needs the owner.",
       "tools": [
         "gmail",
         "notion"
@@ -185,7 +185,7 @@
       "lead": false,
       "name": "INSTAGRAM ORGANIC",
       "role": "Instagram Organic Content Agent",
-      "does": "Runs the IG content engine — hooks, reels, carousels. Nothing posts without AJ.",
+      "does": "Runs the IG content engine — hooks, reels, carousels. Nothing posts without the owner.",
       "tools": [
         "canva",
         "clarity"
@@ -314,7 +314,7 @@
       "lead": true,
       "name": "DELIVERY LEAD",
       "role": "Delivery Lead",
-      "does": "Owns every live project end to end — risk, timelines, staffing, handovers — and reports the state of play to AJ weekly.",
+      "does": "Owns every live project end to end — risk, timelines, staffing, handovers — and reports the state of play to the owner weekly.",
       "tools": [
         "notion",
         "gmail"

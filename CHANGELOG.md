@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.0-beta.1 — 7 Sep 2026
+
+- **Skills: teach an agent how a kind of work is done.** A folder in your brain, `<brain>/Agents Office/skills/<name>/`, with a `SKILL.md` (when it applies, the steps, the shape, the rules) and the template or example beside it, bound to agents or departments in its front matter. Read in full before every task and chat turn for those agents; the deliverable names the skill it followed and the saved note records it. Re-read from disk on every task, so no restart. Three examples ship in `skills/`. Guide: `SKILLS.md`.
+- **Briefs.** A `brief` field on any agent in the roster: standing instructions, up to 2,000 characters, read before every task and chat turn.
+- **The roster can live in the brain.** `<brain>/Agents Office/agents.json` is read between the shipped roster and the local file.
+- The router sees each agent's skills, so a task that names a kind of work lands on the agent who owns that skill.
+- `CLAUDE.md` tells Claude Code how to turn an SOP, a template or a good example into a skill and where to write it. `npm run check` validates skills; `/api/skills` lists what is loaded.
+- The shipped roster no longer names anyone: "the owner" throughout.
+
 ## 3.1.0-beta.3 — 7 Sep 2026
 
 - One HTML file. The separate dark build is gone; `D` and http://localhost:4520/dark open the same file in dark mode.

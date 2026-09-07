@@ -46,6 +46,9 @@ Without `./setup`: `npm install && node build.mjs && npm start`.
    click it to read where it sits and who read or wrote it.
 5. The top bar shows the connectors your Claude Code is connected to. When an agent uses one,
    its logo pulses and the wire into that department lights up.
+6. The first deliverables will be competent and generic: the agents know the sample studio and
+   one sentence about their own job. Point the brain at your notes, then teach them how you
+   work (below). That is where the office becomes yours.
 
 ## Connectors
 
@@ -95,11 +98,54 @@ office and the desks carry the new names. Edit the file by hand if you prefer; t
 ```json
 { "agents": [
   { "id": "newt", "name": "PODCAST NOTES", "role": "Podcast Notes Agent",
-    "does": "Turns each episode into show notes and a LinkedIn post.", "tools": ["google drive"] }
+    "does": "Turns each episode into show notes and a LinkedIn post.", "tools": ["google drive"],
+    "brief": "Show notes are five bullets and a pull quote. The LinkedIn post opens with the quote, never with the episode title." }
 ] }
 ```
 
-Edits to `id`, `department` or `lead` are ignored, and the server says so at start.
+Edits to `id`, `department` or `lead` are ignored, and the server says so at start. The same
+file can also sit in your brain as `<brain>/Agents Office/agents.json`; the office reads the
+shipped roster, then the brain's, then the local file.
+
+## Teach the agents how you work
+
+Renaming an agent says what it does. It does not say *how*. Out of the box every agent knows
+its one-line job, your notes, and a rule to hand over a finished deliverable, so the first
+results are competent and generic. Two ways to fix that, both read before every task:
+
+- **A brief** is a few standing sentences on one agent: tone, red lines, who to escalate to.
+  It is the `brief` field above.
+- **A skill** is a folder in your brain, `<brain>/Agents Office/skills/<name>/`, with a
+  `SKILL.md` (when it applies, the steps, the shape, the rules) and the template or example
+  beside it. Bind it to an agent or a department in its front matter. Same shape as a Claude
+  Code skill.
+
+```markdown
+---
+name: proposal
+description: How we write a client proposal
+agents: [piper]
+---
+# Writing a proposal
+Use this for any request that ends in a document a client says yes or no to.
+1. Prices come from `10-Business/offer-ladder.md`. Never invent one.
+2. Follow `template.md` beside this file, section for section.
+- Three options, always. Recommend the middle one.
+```
+
+Three example skills ship in `skills/` for the sample studio. The fastest way to write yours is
+to hand Claude Code what you already have, the SOP, the email you keep copying, the last report
+you were happy with, and ask for a skill:
+
+```
+claude
+> Here is the proposal I sent Harbourside. Turn it into a skill for the Proposals agent: the
+  shape as a template, the rules I follow, and keep this one as the example.
+```
+
+Skills take effect on the next task, no restart. `npm run check` validates them and
+http://localhost:4520/api/skills shows who has what. The full guide, including what the agent
+sees and how to write a good one, is **[SKILLS.md](SKILLS.md)**.
 
 ## Make it yours
 
@@ -151,8 +197,10 @@ first thing to run after any change.
 | `src/` | The office: `main.js` scene, `tasks.js` task panel, `brain.js` the Brain, `mcp.js` connectors, `data.js` departments and roster, `v1data.js` agent personalities |
 | `serve.mjs` | The local server: routing, deliverables, chat, the live Brain graph |
 | `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
-| `roster.mjs` · `office.agents.json` | The 33 agents: names, roles, what they do, their tools (`office.agents.local.json` overrides) |
-| `CLAUDE.md` | What Claude Code does when you ask it to change agents or connectors in this folder |
+| `roster.mjs` · `office.agents.json` | The 33 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |
+| `skills.mjs` · `skills/` | Skills: how a kind of work is done, bound to agents or departments (`<brain>/Agents Office/skills/` is yours) |
+| `SKILLS.md` | The guide to briefs and skills |
+| `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, or change connectors in this folder |
 | `graph-build.mjs` | Reads your brain folder and lays out the graph |
 | `brain/` | The sample brain |
 | `data/tasks.json` | Your tasks (created on first run, ignored by git) |
@@ -160,7 +208,8 @@ first thing to run after any change.
 ## Privacy
 
 Your notes are read from disk and sent to Claude only as context for the task or chat at hand
-(a handful of the most relevant notes, plus your brain's `CLAUDE.md` and `index.md` if present).
+(a handful of the most relevant notes, plus your brain's `CLAUDE.md` and `index.md` if present,
+plus the agent's brief and skills).
 When an agent calls a connector, that call goes to that service through your own Claude Code
 login, exactly as it would if you called it yourself. Nothing else leaves your machine.
 Deliverables are saved locally.
