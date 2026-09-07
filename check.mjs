@@ -24,7 +24,7 @@ const LIVE = process.env.CHECK_LIVE === '1';
 /* ---------- 1. build ---------- */
 await step('build: braingraph + bundle', async () => {
   const out = await sh('node', ['build.mjs']);
-  const html = fs.readFileSync(path.join(ROOT, 'command-centre-v2.html'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'dist', 'command-centre-v2.html'), 'utf8');
   if (html.length < 500000) throw new Error('bundle looks too small: ' + html.length);
   if (!/AGENTS OFFICE/.test(html)) throw new Error('shell missing');
   return out.trim().split('\n').pop();
@@ -138,7 +138,7 @@ else {
     catch { browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] }); }
     const page = await browser.newPage({ viewport: { width: 1512, height: 900 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 120)); });
-    await page.goto('file://' + path.join(ROOT, 'command-centre-v2.html') + '?s=check'); await page.waitForTimeout(3000);
+    await page.goto('file://' + path.join(ROOT, 'dist', 'command-centre-v2.html') + '?s=check'); await page.waitForTimeout(3000);
     await step('smoke: loads without page errors', async () => { if (errors.length) throw new Error(errors[0]); });
     await step('smoke: 33 agents at their desks', async () => { const n = await page.evaluate(() => Object.keys(window.CC.R).length); if (n !== 33) throw new Error('agents: ' + n); return n + ' agents'; });
     await step('smoke: six department cards + the Brain tag', async () => {

@@ -36,7 +36,8 @@ Without `./setup`: `npm install && node build.mjs && npm start`.
 ## First five minutes
 
 1. Open http://localhost:4520. The panel on the right says **LIVE · CLAUDE** when the server is
-   connected. Opened as a plain file it runs on its own without a server.
+   connected. Double-clicking `dist/command-centre-v2.html` opens the same office on its own,
+   without a server, in demo mode.
 2. In the bar at the top of the panel, pick a department, type a task in plain words, press **Add**.
    Claude picks the agent and names them; the task appears in the feed; the agent picks it up,
    works, and the deliverable lands in that agent's chat and in your brain folder as a note.
@@ -223,6 +224,7 @@ first thing to run after any change.
 | `SKILLS.md` | The guide to briefs and skills |
 | `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, or change connectors in this folder |
 | `graph-build.mjs` | Reads your brain folder and lays out the graph |
+| `dist/command-centre-v2.html` | The office as one built file (`node build.mjs` from `src/`); the server serves it, or double-click it for the demo |
 | `brain/` | The sample brain |
 | `data/tasks.json` | Your tasks (created on first run, ignored by git) |
 

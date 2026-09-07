@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.0-beta.2 — 7 Sep 2026
+
+- The built office page moved from the repo root to `dist/command-centre-v2.html`. Same file, same double-click demo, cleaner repo page. `build.mjs`, `npm start` and the checks all point there.
+
 ## 3.3.0-beta.1 — 7 Sep 2026
 
 - **The lead interviews you.** Say "set up" to a department lead. Five questions, one at a time; then it writes a brief for each agent on its team and a skill for the job you described, into your brain, and tells you what it wrote and one task to try. "skip", "done", "cancel". A lead whose department has nothing of yours yet offers this in its greeting.

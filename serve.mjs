@@ -35,7 +35,7 @@ import * as learn from './learn.mjs';
 import * as onboard from './onboard.mjs';
 
 const cfg = loadConfig();
-const HTML = path.join(ROOT, 'command-centre-v2.html');
+const HTML = path.join(ROOT, 'dist', 'command-centre-v2.html'); // built by build.mjs; shipped so npm start works without a build
 const DATA = path.join(ROOT, 'data');
 const FILE = path.join(DATA, 'tasks.json');
 const BRAIN = cfg.brainPath;
