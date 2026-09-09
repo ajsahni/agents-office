@@ -17,7 +17,7 @@
 import { DEPTS, AGENTS, DEPT_KEYS } from './data.js';
 import { P, rnd, ri } from './v1data.js';
 import { parseWhen, describe, nextRun, fromPicker, untilText } from './when.js';
-import { MODEL_KEYS, MODELS, DEFAULT_MODEL, modelName, normModel, FROM_TEXT } from './models.js';
+import { MODEL_KEYS, MODELS, DEFAULT_MODEL, modelName, normModel, FROM_TEXT , EFFORT_KEYS, EFFORT_NAME, normEffort, effortName, effortFor } from './models.js';
 
 const SEGMENTS = ['roofing', 'HVAC', 'dental', 'logistics', 'fitness', 'property', 'landscaping', 'legal'];
 
@@ -274,8 +274,16 @@ export function initTasks(ctx) {
     hint: panel.querySelector('.tp-hint'), chips: panel.querySelector('.tp-chips'), rows: panel.querySelector('.tp-rows'),
     scope: panel.querySelector('.tp-scope'),
     rep: panel.querySelector('.tp-rep'), repRow: panel.querySelector('.tp-rep-row'), cad: panel.querySelector('.tp-cad'), at: panel.querySelector('.tp-at'), okc: panel.querySelector('.tp-okc'), next: panel.querySelector('.tp-next'),
-    model: panel.querySelector('.tp-model'),
+    model: panel.querySelector('.tp-model'), effort: panel.querySelector('.tp-effort'),
+    bigBtn: panel.querySelector('.tp-big-btn'),
   };
+  // V3.7: the box grows with the text (one line at rest, six at most) and the big editor mirrors it
+  const big = document.getElementById('tpBig');
+  const B_ = { in: big.querySelector('.tb-in'), dept: big.querySelector('.tb-dept'), dot: big.querySelector('.tb-head .dot'), hint: big.querySelector('.tb-hint'), add: big.querySelector('.tb-add'), close: big.querySelector('.tb-close') };
+  function grow() { P_.input.style.height = '30px'; P_.input.style.height = Math.min(118, Math.max(30, P_.input.scrollHeight)) + 'px'; }
+  function openBig() { B_.in.value = P_.input.value; B_.in.placeholder = P_.input.placeholder; big.classList.add('on'); mirrorHint(); B_.in.focus(); B_.in.setSelectionRange(B_.in.value.length, B_.in.value.length); }
+  function closeBig() { if (!big.classList.contains('on')) return; big.classList.remove('on'); grow(); if (P_.input.value) P_.input.focus(); }
+  function mirrorHint() { B_.hint.innerHTML = P_.hint.innerHTML; B_.hint.className = P_.hint.className.replace('tp-hint', 'tp-hint tb-hint'); }
   // V3.6 (D2): the model menu — Sonnet · Opus · Fable. Shows the office default; change it and it applies to this task (or this routine, with REPEAT on)
   let officeModel = DEFAULT_MODEL, modelTouched = false;
   P_.model.innerHTML = MODEL_KEYS.map(k => `<option value="${k}">${MODELS[k].name.toUpperCase()}</option>`).join('');
@@ -284,8 +292,23 @@ export function initTasks(ctx) {
   P_.model.addEventListener('keydown', e => e.stopPropagation());
   function setOfficeModel(k) { officeModel = normModel(k) || DEFAULT_MODEL; if (!modelTouched) P_.model.value = officeModel; }
   const chosenModel = () => (modelTouched ? P_.model.value : null);
-  function resetModel() { modelTouched = false; P_.model.value = officeModel; P_.model.classList.remove('set'); }
-  const modelBit = t => t.modelUsed ? ` · ${modelName(t.modelUsed)}${t.modelFrom && t.modelFrom !== 'office' ? ' (' + FROM_TEXT[t.modelFrom] + ')' : ''}` : '';
+  function resetModel() { modelTouched = false; P_.model.value = officeModel; P_.model.classList.remove('set'); resetEffort(); }
+  const modelBit = t => t.modelUsed ? ` · ${modelName(t.modelUsed)}${t.effortUsed ? ' ' + t.effortUsed : ''}${t.modelFrom && t.modelFrom !== 'office' ? ' (' + FROM_TEXT[t.modelFrom] + ')' : ''}` : '';
+  // V3.6.1: the EFFORT menu beside the model — AUTO (the model's own; Opus = high) · Low · Medium · High · Extra high · Max. Same precedence as the model.
+  let officeEffort = '', effortTouched = false;
+  P_.effort.innerHTML = `<option value="">AUTO</option>` + EFFORT_KEYS.map(k => `<option value="${k}">${EFFORT_NAME[k].toUpperCase()}</option>`).join('');
+  P_.effort.value = officeEffort;
+  P_.effort.addEventListener('change', () => { effortTouched = P_.effort.value !== officeEffort; P_.effort.classList.toggle('set', effortTouched); updateHint(); });
+  P_.effort.addEventListener('keydown', e => e.stopPropagation());
+  function setOfficeEffort(k) { officeEffort = normEffort(k) || ''; if (!effortTouched) P_.effort.value = officeEffort; }
+  const chosenEffort = () => (effortTouched ? (P_.effort.value || 'auto') : null); // 'auto' = the owner chose the model's own over the office's
+  const effortSend = () => { const e = chosenEffort(); return e && e !== 'auto' ? e : undefined; };
+  function resetEffort() { effortTouched = false; P_.effort.value = officeEffort; P_.effort.classList.remove('set'); }
+  const effortUsedFor = (mdl) => effortFor({ task: effortSend(), office: chosenEffort() === 'auto' ? '' : officeEffort, model: mdl }); // what a demo card will show
+  const pickBit = (forWhat) => { // the hint's "Opus · High for this task"
+    const bits = []; if (modelTouched) bits.push(modelName(P_.model.value)); if (effortTouched) bits.push(effortName(P_.effort.value || ''));
+    return bits.length ? ` · <b>${bits.join(' · ')}</b> for this ${forWhat}` : '';
+  };
   // the REPEAT picker (B1): cadence + time; "needs my OK" defaults on (D1)
   let repeat = false;
   P_.cad.innerHTML = [['weekdays', 'Every weekday'], ['daily', 'Every day'], ['mon', 'Mondays'], ['tue', 'Tuesdays'], ['wed', 'Wednesdays'], ['thu', 'Thursdays'], ['fri', 'Fridays'], ['sat', 'Saturdays'], ['sun', 'Sundays'], ['hourly', 'Every hour, 9–5, weekdays']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
@@ -303,6 +326,7 @@ export function initTasks(ctx) {
     dept = k;
     P_.ddName.textContent = DEPTS[k].short;
     P_.ddDot.style.background = DEPTS[k].chip;
+    B_.dept.textContent = DEPTS[k].name.toUpperCase(); B_.dot.style.background = DEPTS[k].chip;
     P_.input.placeholder = `Type a task for ${DEPTS[k].name.toLowerCase()}…`;
     updateHint();
   }
@@ -318,6 +342,7 @@ export function initTasks(ctx) {
     return { agent: best, matched: bestN > 0 };
   }
   function updateHint() {
+    grow();
     const text = P_.input.value.trim();
     if (!text) { P_.hint.innerHTML = ''; P_.hint.classList.remove('on'); return; }
     const rt = routineIntent(text);
@@ -327,7 +352,7 @@ export function initTasks(ctx) {
       const need = rt.needsDay ? 'which day? say "every Monday …"' : rt.needsTime ? 'what time? add "at 8am"' : null;
       P_.hint.innerHTML = `<span class="tp-av" style="border-color:${DEPTS[ra.dept].chip};background:${DEPTS[ra.dept].chip}55">⏱</span>Routine · <b>${esc(describe(rt.when) || 'every week')}</b>` +
         (need ? ` · <span class="tp-amber">${need}</span>` : live ? ' · Claude names the agent when you press Add' : ` · goes to <b>${ra.name}</b>`) + (rt.guessed ? ` · "${esc(rt.guessWord)}" taken as ${rt.when.at}` : '');
-      if (modelTouched) P_.hint.innerHTML += ` · <b>${modelName(P_.model.value)}</b> for this routine`;
+      P_.hint.innerHTML += pickBit('routine');
       P_.hint.className = 'tp-hint on'; return;
     }
     const { agent: a, matched } = route(dept, text);
@@ -336,17 +361,29 @@ export function initTasks(ctx) {
     P_.hint.innerHTML = `<span class="tp-av" style="border-color:${chip};background:${chip}55">${a.name[0]}</span>` +
       (live ? `Probably <b>${a.name}</b> · Claude confirms when you press Add`
             : `Goes to <b>${a.name}</b> · ${busy ? 'starts after their current job' : 'starts straight away'}${matched ? '' : ' · say more and I’ll pick a specialist'}`) +
-      (modelTouched ? ` · <b>${modelName(P_.model.value)}</b> for this task` : '');
+      pickBit('task');
     P_.hint.className = 'tp-hint on';
   }
-  P_.input.addEventListener('input', () => { panel.querySelector('.tp-cmd').classList.toggle('typing', !!P_.input.value); updateHint(); });
+  P_.input.addEventListener('input', () => { panel.querySelector('.tp-cmd').classList.toggle('typing', !!P_.input.value); grow(); updateHint(); });
   P_.input.addEventListener('blur', () => { if (!P_.input.value) panel.querySelector('.tp-cmd').classList.remove('typing'); });
-  P_.input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') submit(); if (e.key === 'Escape') P_.input.blur(); });
+  P_.input.addEventListener('keydown', (e) => { // Enter adds, Shift+Enter is a new line, ⌘⇧E opens the big editor
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+    else if (e.key === 'Escape') P_.input.blur();
+    else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'e') { e.preventDefault(); openBig(); }
+  });
   P_.add.addEventListener('click', submit);
-  function say(html, cls) { P_.hint.innerHTML = html; P_.hint.className = 'tp-hint on' + (cls ? ' ' + cls : ''); }
+  P_.bigBtn.addEventListener('click', openBig);
+  B_.in.addEventListener('input', () => { P_.input.value = B_.in.value; P_.input.dispatchEvent(new Event('input', { bubbles: true })); mirrorHint(); });
+  B_.in.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); } else if (e.key === 'Escape') closeBig(); });
+  B_.add.addEventListener('click', submit);
+  B_.close.addEventListener('click', closeBig);
+  big.addEventListener('click', (e) => { if (e.target === big) closeBig(); });
+  function say(html, cls) { P_.hint.innerHTML = html; P_.hint.className = 'tp-hint on' + (cls ? ' ' + cls : ''); grow(); if (big.classList.contains('on')) mirrorHint(); }
   async function submit() {
     let title = P_.input.value.trim().replace(/[.!]+$/, '');
     if (!title) return;
+    big.classList.remove('on');
     title = title.charAt(0).toUpperCase() + title.slice(1);
     const rt = routineIntent(title);
     if (rt) { await submitRoutine(rt, title); return; }
@@ -356,10 +393,10 @@ export function initTasks(ctx) {
       say(`Routing through Claude — ${DEPTS[k].name.toLowerCase()} is reading it…`, 'busy');
       try {
         const mdl = chosenModel();
-        const r = await fetch(API + '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, model: mdl || undefined }) });
+        const r = await fetch(API + '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, model: mdl || undefined, effort: effortSend() }) });
         if (!r.ok) throw new Error((await r.json()).error || r.statusText);
         const st = await r.json();
-        const t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, why: st.why, by: 'you', live: true, sid: st.id, model: st.model, modelUsed: st.model || officeModel, modelFrom: st.model ? 'task' : 'office' });
+        const t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, why: st.why, by: 'you', live: true, sid: st.id, model: st.model, modelUsed: st.model || officeModel, modelFrom: st.model ? 'task' : 'office', effort: st.effort });
         resetModel();
         touch(t, 'added'); spawnEmote(R[t.agent], '📋');
         say(`Added — <b>${agentOf(t.agent).name}</b> has it${st.why ? ' · ' + esc(st.why) : ''}`);
@@ -373,7 +410,7 @@ export function initTasks(ctx) {
     }
     const { agent: a } = route(dept, title);
     const t = addTask(a.id, title, 'you');
-    if (t) { const mdl = chosenModel(); t.modelUsed = mdl || officeModel; t.modelFrom = mdl ? 'task' : 'office'; }
+    if (t) { const mdl = chosenModel(); t.modelUsed = mdl || officeModel; t.modelFrom = mdl ? 'task' : 'office'; const ef = effortUsedFor(t.modelUsed); t.effortUsed = ef.effort || ''; t.effortFrom = ef.from; }
     resetModel();
     P_.input.value = ''; updateHint();
     if (t) { say(`Added — <b>${a.name}</b> has it.`); setTimeout(updateHint, 2600); P_.input.blur(); }
@@ -391,7 +428,7 @@ export function initTasks(ctx) {
       P_.input.disabled = true; P_.add.disabled = true;
       say('Setting the routine — Claude is naming the agent…', 'busy');
       try {
-        const r = await fetch(API + '/routines', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, when: rt.when, needsOk: rt.picker ? P_.okc.checked : undefined, model: chosenModel() || undefined }) });
+        const r = await fetch(API + '/routines', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, when: rt.when, needsOk: rt.picker ? P_.okc.checked : undefined, model: chosenModel() || undefined, effort: effortSend() }) });
         const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText);
         setRoutines([...routines.filter(x => x.id !== j.routine.id), j.routine]);
         const a = agentOf(j.routine.agent);
@@ -404,7 +441,7 @@ export function initTasks(ctx) {
     }
     const { agent: a } = route(k, text);
     const r = addRoutine(k, a.id, text, rt.when, rt.picker ? P_.okc.checked : guessOk(text));
-    r.model = chosenModel() || undefined; resetModel();
+    r.model = chosenModel() || undefined; r.effort = effortSend(); resetModel();
     P_.input.value = ''; say(`Routine set — <b>${a.name}</b> · ${esc(r.desc)} · next ${esc(untilText(r.nextAt))}${r.needsOk ? ' · waits for your OK' : ' · read-only'}`);
     spawnEmote(R[a.id], '⏱'); feedPush(R[a.id], '⏱', `New routine: ${r.title} (${r.desc})`); filter = 'sched'; render(true); P_.input.blur(); setTimeout(updateHint, 5000);
   }
@@ -478,13 +515,13 @@ export function initTasks(ctx) {
     if (!t) {
       t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, by: st.by === 'routine' ? 'routine' : 'you', live: true, srv: !!st.routine, sid: st.id,
         routine: st.routine, when: st.when, late: !!st.late, due: st.due, needsOk: !!st.needsOk, addedAt: st.addedAt, changedAt: st.addedAt, last: 'added',
-        model: st.model, modelUsed: st.modelUsed || st.model || undefined, modelFrom: st.modelFrom || (st.model ? 'task' : undefined) });
+        model: st.model, modelUsed: st.modelUsed || st.model || undefined, modelFrom: st.modelFrom || (st.model ? 'task' : undefined), effort: st.effort, effortUsed: st.effortUsed, effortFrom: st.effortFrom });
       if (st.state !== 'done') { spawnEmote(R[t.agent], st.routine ? '⏱' : '📋'); if (st.routine) feedPush(R[t.agent], '⏱', `Routine fired: ${t.title}${t.late ? ' (late — was due ' + timeStr(t.due) + ')' : ''}`); }
       touch(t, 'added');
     }
     apply(t, st);
   }
-  function copyResult(t, st) { t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; t.draft = st.draft; t.approved = !!st.approved; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; } }
+  function copyResult(t, st) { t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; t.draft = st.draft; t.approved = !!st.approved; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; t.effortUsed = st.effortUsed || ''; t.effortFrom = st.effortFrom; } }
   function apply(t, st) {
     if (st.state === 'doing' && t.state !== 'doing') {
       t.state = 'doing'; t.startedAt = performance.now() - Math.max(0, Date.now() - (st.startedAt || Date.now())); t.progress = 0; t.pausedAt = null; t.running = true; t.ready = false; t.srv = true; t.changedAt = st.startedAt || Date.now(); touch(t, 'started');
@@ -526,7 +563,7 @@ export function initTasks(ctx) {
       const r = await fetch(`${API}/tasks/${t.sid}/${feedback ? 'revise' : 'run'}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(feedback ? { feedback } : {}) });
       if (!r.ok) throw new Error((await r.json()).error || r.statusText);
       const st = await r.json();
-      t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; }
+      t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; t.effortUsed = st.effortUsed || ''; t.effortFrom = st.effortFrom; }
       usageDue = true;
       if (t.tools.length && onTools) onTools(t.agent, t.tools); // the connectors the agent really pulled on light up
       if (brain && !t.error) fetch(API + '/brain').then(r => r.json()).then(g => brain.setGraph(g)).catch(() => {}); // the new note joins the graph
@@ -545,7 +582,7 @@ export function initTasks(ctx) {
     try {
       const h = await (await fetch(API + '/health')).json();
       if (!h.ok) return;
-      live = true; setOfficeModel(h.model);
+      live = true; setOfficeModel(h.model); setOfficeEffort(h.effort);
       const mode = panel.querySelector('.tp-mode');
       if (mode) { mode.hidden = false; mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${modelName(h.model)} by default · brain: ${h.brain}`; }
       if (brain) { try { brain.setGraph(await (await fetch(API + '/brain')).json()); } catch {} }
@@ -737,7 +774,7 @@ export function initTasks(ctx) {
     board.open = true;
     el.className = 'company';
     renderBoard();
-    requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('on'); dim.classList.add('on'); }));
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (!board.open) return; el.classList.add('on'); dim.classList.add('on'); })); // a close before this frame must win, or the board sits open with nothing to close it
   }
   function close() { if (!board.open) return; board.open = false; el.classList.remove('on'); dim.classList.remove('on'); }
   function toggle() { board.open ? close() : open(); }
@@ -839,5 +876,5 @@ export function initTasks(ctx) {
 
   return { tick, toggle, open, close, openFor, isOpen, boardWidth, onFocusChange, onStuck, onResolve,
            handleChat, addTask, revise, rowHTML, setDept, tasks, panelWidth: () => panel.offsetWidth, isLive: () => live,
-           routines, addRoutine, rtAct, railFor, syncPills, refresh: poll, resolveLive, pendingReject, rejectLive, officeModel: () => officeModel, chosenModel };
+           routines, addRoutine, rtAct, railFor, syncPills, refresh: poll, resolveLive, pendingReject, rejectLive, officeModel: () => officeModel, chosenModel, chosenEffort };
 }

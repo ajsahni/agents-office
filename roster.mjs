@@ -14,12 +14,13 @@ import { V1 } from './src/v1data.js';
 export const FILE = path.join(ROOT, 'office.agents.json');
 export const LOCAL = path.join(ROOT, 'office.agents.local.json');
 export const brainFile = brainPath => path.join(brainPath, 'Agents Office', 'agents.json');
-const EDITABLE = ['name', 'role', 'does', 'tools', 'brief', 'model'];
+const EDITABLE = ['name', 'role', 'does', 'tools', 'brief', 'model', 'effort'];
 const BRIEF_MAX = 2000;
 const MODELS = ['sonnet', 'opus', 'fable']; // V3.6: an agent's model, by name; empty = the office default
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']; // V3.6.1: an agent's effort; empty = the office's, then the model's own
 
 export function defaults() {
-  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [], brief: '', model: '' }; });
+  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [], brief: '', model: '', effort: '' }; });
 }
 // returns { agents, problems } — problems are human sentences, never thrown
 export function validate(doc, base = defaults()) {
@@ -44,6 +45,10 @@ export function validate(doc, base = defaults()) {
     if (e.model !== undefined) { // V3.6: sonnet · opus · fable, or empty for the office default
       const m = String(e.model || '').toLowerCase().trim();
       if (!m) a.model = ''; else if (MODELS.includes(m)) a.model = m; else problems.push(`"${e.id}": model must be sonnet, opus or fable (got "${e.model}") — kept ${a.model || 'the office default'}`);
+    }
+    if (e.effort !== undefined) { // V3.6.1: low · medium · high · xhigh · max, or empty
+      const v = String(e.effort || '').toLowerCase().trim();
+      if (!v) a.effort = ''; else if (EFFORTS.includes(v)) a.effort = v; else problems.push(`"${e.id}": effort must be low, medium, high, xhigh or max (got "${e.effort}") — kept ${a.effort || 'the default'}`);
     }
     if (e.brief !== undefined) { // a string, or a list of lines
       const b = (Array.isArray(e.brief) ? e.brief.map(String).join('\n') : String(e.brief)).trim();

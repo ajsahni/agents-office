@@ -178,6 +178,9 @@ Three ways to set one, all the same underneath:
 - **Type it in the bar with the time in the sentence.** `every weekday at 8am, triage the
   inbox and tell me what needs me`. The hint line reads the schedule back before you press Add.
   Or press **REPEAT** and pick a cadence and a time. Times are this machine's clock.
+
+The task box grows as you type (Shift+Enter for a new line, Enter adds). The ⤢ button in the box, or
+⌘⇧E, opens a big editor with room for a whole brief; ⌘↵ adds from there, Esc closes.
 - **Tell a department lead in chat.** "every Monday 9am, list the overdue invoices and draft the
   reminders". The lead puts it on the right desk and reads the timetable back on `routines`;
   `pause …`, `resume …`, `run … now` and `delete …` work with a few words from the name.
@@ -209,8 +212,12 @@ default for everything, including the routing call that names the agent. The men
 in the bar shows the office default; change it and it applies to the task you are typing (or the
 routine, with REPEAT on). Four places, one precedence: the task beats the routine beats the agent
 (a `model` field in the roster) beats the office default (`model` in `office.config.json`). Every
-card says which model ran and, if it was set above the default, where. Effort lives inside the
-name: Opus runs at high; nobody sees an effort setting.
+card says which model ran and, if it was set above the default, where.
+
+**Effort** sits beside the model: AUTO, Low, Medium, High, Extra high, Max, the levels Claude Code
+itself uses. AUTO is the model's own level (Opus runs at high). Set it on a task, a routine, an
+agent (an `effort` field in the roster) or the office (`effort` in `office.config.json`), same
+precedence as the model, and the card shows it next to the model name.
 
 The top bar shows what your Claude plan has used, the way Claude Code's own usage screen shows
 it: **session** and **week**, a bar and a percentage, reset times on hover. It is read from the

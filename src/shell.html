@@ -557,10 +557,13 @@
     box-shadow: 0 24px 70px rgba(21,20,20,.14);
     padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 9px;
   }
-  .tp-cmd {
-    position: relative; display: flex; align-items: center; gap: 6px;
-    border: 1.5px solid var(--ink); border-radius: 99px; background: #fff; padding: 5px 6px 5px 6px;
+  .tp-cmd { /* V3.7: two rows — the department + the text on top, model / REPEAT / ADD underneath, so the box can grow */
+    position: relative; display: flex; flex-direction: column; gap: 4px;
+    border: 1.5px solid var(--ink); border-radius: 18px; background: #fff; padding: 5px 6px 6px 6px;
   }
+  .tp-r1 { display: flex; align-items: flex-start; gap: 4px; }
+  .tp-r2 { display: flex; align-items: center; gap: 6px; padding: 0 2px 0 4px; }
+  .tp-r2 .sp { flex: 1; }
   .tp-dd {
     display: flex; align-items: center; gap: 6px; border: 0; background: none; cursor: pointer; flex: none;
     font-family: var(--ui); font-size: 10px; letter-spacing: .14em; font-weight: 600; color: var(--ink);
@@ -582,9 +585,35 @@
   .tp-menu button:hover { background: rgba(21,20,20,.06); }
   .tp-menu .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .tp-in {
-    flex: 1; min-width: 0; border: 0; outline: none; background: none;
-    font-family: var(--ui); font-size: 13px; color: var(--ink); padding: 4px 2px;
+    flex: 1; min-width: 0; border: 0; outline: none; background: none; resize: none; display: block;
+    font-family: var(--ui); font-size: 13px; line-height: 1.4; color: var(--ink); padding: 6px 4px 5px;
+    height: 30px; max-height: 118px; overflow-y: auto; /* one line at rest, grows as you type (six lines), scrolls after */
   }
+  .tp-big-btn { /* the expand button inside the box → the big editor */
+    flex: none; width: 24px; height: 24px; margin-top: 3px; border: 0; background: none; color: var(--grey); cursor: pointer;
+    border-radius: 7px; font-size: 13px; line-height: 1; display: grid; place-items: center; transition: all .25s var(--ease);
+  }
+  .tp-big-btn:hover { background: rgba(21,20,20,.07); color: var(--ink); }
+  /* the big editor: the same task box, room to write a brief */
+  #tpBig { position: fixed; inset: 0; z-index: 26; display: none; align-items: center; justify-content: center; background: rgba(21,20,20,.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  #tpBig.on { display: flex; }
+  .tb-box { width: min(760px, 92vw); height: min(560px, 84vh); background: #fff; border: 1.5px solid var(--ink); border-radius: 22px; box-shadow: 0 34px 90px rgba(21,20,20,.3);
+    display: flex; flex-direction: column; padding: 14px 16px 12px; gap: 8px; animation: tbin .35s var(--ease); }
+  @keyframes tbin { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+  .tb-head { display: flex; align-items: center; gap: 8px; font-family: var(--ui); font-size: 10px; letter-spacing: .14em; font-weight: 600; color: var(--ink); }
+  .tb-head .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .tb-head .lab { color: var(--grey); font-weight: 700; }
+  .tb-head .sp { flex: 1; }
+  .tb-close { border: 0; background: none; color: var(--grey); cursor: pointer; font-size: 15px; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; }
+  .tb-close:hover { background: rgba(21,20,20,.07); color: var(--ink); }
+  .tb-in { flex: 1; min-height: 0; border: 1px solid var(--hairline); border-radius: 14px; outline: none; background: none; resize: none;
+    font-family: var(--ui); font-size: 15px; line-height: 1.5; color: var(--ink); padding: 14px 16px; }
+  .tb-in:focus { border-color: var(--ink); }
+  .tb-in::placeholder { color: var(--grey); }
+  .tb-foot { display: flex; align-items: center; gap: 8px; }
+  .tb-foot .tp-hint { flex: 1; padding: 0 4px; min-height: 0; }
+  .tb-foot .kb { font-size: 9.5px; letter-spacing: .08em; color: var(--grey); white-space: nowrap; }
+  .tb-foot .kb b { font-weight: 600; color: var(--ink); }
   .tp-in::placeholder { color: var(--grey); }
   .tp-add {
     flex: none; border: 1px solid var(--ink); background: var(--ink); color: var(--cream); cursor: pointer;
@@ -665,11 +694,14 @@
   .tp-rep-row { display: flex; gap: 6px; align-items: center; margin: -2px 0 6px; }
   .tp-rep-row[hidden], .tp-next[hidden], .mrt[hidden] { display: none; }
   .tp-model { font-family: var(--ui); font-size: 8.5px; letter-spacing: .1em; font-weight: 700; text-transform: uppercase; color: var(--grey); background: none;
-    border: 0; border-left: 1px solid var(--hairline); border-radius: 0; padding: 4px 2px 4px 7px; cursor: pointer; max-width: 70px; flex: none; }
+    border: 1px solid var(--hairline); border-radius: 99px; padding: 4px 6px 4px 8px; cursor: pointer; max-width: 90px; flex: none; }
+  .tp-model:hover, .tp-effort:hover { border-color: var(--ink); color: var(--ink); }
+  .tp-effort { font-family: var(--ui); font-size: 8.5px; letter-spacing: .1em; font-weight: 700; text-transform: uppercase; color: var(--grey); background: none;
+    border: 1px solid var(--hairline); border-radius: 99px; padding: 4px 6px 4px 8px; cursor: pointer; max-width: 92px; flex: none; }
+  .tp-effort.set { color: var(--ink); }
   .tp-model.set { color: var(--ink); }
   .tp-cmd .tp-rep { font-size: 8.5px; padding: 4px 7px; }
   .tp-cmd .tp-add { padding: 6px 10px; font-size: 9.5px; }
-  .tp-cmd.typing .tp-ddn { display: none; } /* while a task is being typed the department shows as its dot — the hint line names the agent */
   /* V3.6 the usage gauge, top bar: SESSION [bar] 29% · WEEK [bar] 39% — the plan's own numbers */
   .tm-usage { display: flex; align-items: center; gap: 6px; margin-left: 8px; font-family: var(--ui); font-size: 8.5px; letter-spacing: .14em; font-weight: 700; color: var(--grey); white-space: nowrap; cursor: default; }
   .tm-usage b { font-family: var(--serif); font-weight: 400; font-size: 13px; letter-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -679,7 +711,13 @@
   .tm-usage .sep { color: var(--hairline); }
   .tm-usage.off { opacity: .7; }
   body.dark .tp-model { border-color: var(--hairline); color: var(--grey); background: #1B1C21; }
+  body.dark .tb-box { background: #1E1F24; }
+  body.dark .tb-in { color: var(--ink); }
+  body.dark .tp-big-btn:hover, body.dark .tb-close:hover { background: rgba(236,234,227,.1); }
+  body.dark #tpBig { background: rgba(0,0,0,.55); }
   body.dark .tp-model.set { color: var(--ink); border-color: var(--ink); }
+  body.dark .tp-effort { border-color: var(--hairline); color: var(--grey); background: #1B1C21; }
+  body.dark .tp-effort.set { color: var(--ink); border-color: var(--ink); }
   body.dark .tm-usage .ub { background: rgba(236,234,227,.16); }
   .tp-rep-row select, .tp-rep-row input[type=time] { font-family: var(--ui); font-size: 10.5px; letter-spacing: .04em; color: var(--ink); background: #fff;
     border: 1px solid var(--hairline); border-radius: 8px; padding: 5px 7px; }
@@ -894,12 +932,19 @@
 <!-- V3.3: the Task Status panel — always on, right side -->
 <div id="tpanel">
   <div class="tp-cmd">
-    <button class="tp-dd" title="department"><span class="dot"></span><span class="tp-ddn">MARKETING</span></button>
-    <div class="tp-menu"></div>
-    <input class="tp-in" placeholder="Type a task…" autocomplete="off" spellcheck="false">
-    <select class="tp-model" title="which model runs this (the office default unless you change it)"></select>
-    <button class="tp-rep" title="repeat on a schedule (or just say when: every weekday at 8am, …)">REPEAT</button>
-    <button class="tp-add">ADD</button>
+    <div class="tp-r1">
+      <button class="tp-dd" title="department"><span class="dot"></span><span class="tp-ddn">MARKETING</span></button>
+      <div class="tp-menu"></div>
+      <textarea class="tp-in" rows="1" placeholder="Type a task…" autocomplete="off" spellcheck="false"></textarea>
+      <button class="tp-big-btn" title="open the big editor (⌘⇧E)">⤢</button>
+    </div>
+    <div class="tp-r2">
+      <select class="tp-model" title="which model runs this (the office default unless you change it)"></select>
+      <select class="tp-effort" title="how hard it thinks: Auto is the model's own level (Opus runs at high); Low to Max as Claude Code names them"></select>
+      <button class="tp-rep" title="repeat on a schedule (or just say when: every weekday at 8am, …)">REPEAT</button>
+      <span class="sp"></span>
+      <button class="tp-add">ADD</button>
+    </div>
   </div>
   <div class="tp-rep-row" hidden>
     <select class="tp-cad" title="how often"></select>
@@ -911,6 +956,14 @@
   <div class="tp-chips"></div>
   <div class="tp-next" hidden></div>
   <div class="tp-rows"></div>
+</div>
+<!-- V3.7: the big editor — the task box with room for a brief -->
+<div id="tpBig">
+  <div class="tb-box">
+    <div class="tb-head"><span class="lab">TASK FOR</span><span class="dot"></span><span class="tb-dept">MARKETING</span><span class="sp"></span><button class="tb-close" title="close (Esc)">✕</button></div>
+    <textarea class="tb-in" placeholder="Write the task, or a whole brief…" autocomplete="off" spellcheck="false"></textarea>
+    <div class="tb-foot"><div class="tp-hint tb-hint"></div><span class="kb"><b>⌘↵</b> adds · <b>Esc</b> closes</span><button class="tp-add tb-add">ADD</button></div>
+  </div>
 </div>
 <div id="zoomCtl">
   <button id="zIn" title="zoom in (+)">+</button>

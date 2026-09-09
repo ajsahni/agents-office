@@ -10,7 +10,7 @@
 //   { "id": "inbox-triage", "dept": "emails", "agent": "elead",
 //     "title": "Triage the overnight inbox", "text": "Triage the overnight inbox: what needs me, …",
 //     "when": { "kind": "weekdays", "at": "08:00" },      ← src/when.js
-//     "needsOk": false, "paused": false, "model": "opus" }      ← optional: sonnet · opus · fable (default: the office's)
+//     "needsOk": false, "paused": false, "model": "opus", "effort": "high" }   ← optional: model sonnet · opus · fable; effort low · medium · high · xhigh · max (default: the office's, then the model's own)
 //
 // needsOk (default true): the result waits in WAITING ON APPROVAL for the owner's tick before the
 // agent does anything outbound. Switch it off for read-only routines.
@@ -53,6 +53,7 @@ export function validate(r, agents, existing = []) {
   out.paused = r.paused === true;
   if (Array.isArray(r.plan)) out.plan = r.plan.slice(0, 4).map(String);
   if (r.model !== undefined && r.model !== '' && r.model !== null) { const m = String(r.model).toLowerCase().trim(); if (['sonnet', 'opus', 'fable'].includes(m)) out.model = m; else problems.push(`${out.id}: model must be sonnet, opus or fable (got "${r.model}")`); }
+  if (r.effort !== undefined && r.effort !== '' && r.effort !== null) { const e = String(r.effort).toLowerCase().trim(); if (['low', 'medium', 'high', 'xhigh', 'max'].includes(e)) out.effort = e; else problems.push(`${out.id}: effort must be low, medium, high, xhigh or max (got "${r.effort}")`); }
   return { routine: out, problems };
 }
 
@@ -73,7 +74,7 @@ export function load(brainPath, agents) {
 export function save(brainPath, routines) {
   const p = file(brainPath);
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.plan ? { plan: r.plan } : {}) }));
+  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}), ...(r.plan ? { plan: r.plan } : {}) }));
   fs.writeFileSync(p, JSON.stringify({ routines: clean }, null, 2) + '\n');
   return p;
 }
