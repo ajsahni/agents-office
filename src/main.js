@@ -260,9 +260,11 @@ const mcp = {
   showTip: (...a) => mcpImpl && mcpImpl.showTip(...a),
   startReveal: (...a) => mcpImpl && mcpImpl.startReveal(...a),
   setDark: on => { mcpDark = on; if (mcpImpl) mcpImpl.setDark(on); },
+  setUsage: u => { mcpUsage = u; if (mcpImpl) mcpImpl.setUsage(u); }, // V3.6: the plan's gauge; kept until the strip exists
   isLive: () => !!(mcpImpl && mcpImpl.live),
 };
-loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); });
+let mcpUsage = null;
+loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); if (mcpUsage) mcpImpl.setUsage(mcpUsage); });
 
 // plants on outer corners
 for (const k of ['emails', 'sales', 'marketing', 'ops', 'delivery']) {
@@ -768,6 +770,7 @@ function openAgentRail(id, tab = 'chat', fly = true) {
     b.addEventListener('click', () => sendChat(b.textContent)));
   rail.classList.add('agentOpen');
   setTab(tab);
+  if (tasks && tasks.railFor) tasks.railFor(id); // V3.5: the agent's routines strip
   if (fly) { const t = focusTarget(r.a.dept, r.seat); flyTo(t.pos, t.zoom, 500); }
 }
 // V3: the board opening/closing re-centres the pod without leaving focus
@@ -810,6 +813,7 @@ function sendChat(text) {
   document.getElementById('mIn').value = '';
   const low = text.toLowerCase();
   setTimeout(() => {
+    if (tasks && tasks.pendingReject(id)) { tasks.rejectLive(id, text); return; } // V3.5: the line after REJECT is the note the agent reworks with
     if (r.state === 'stuck' && /\b(approve|reject)\b/.test(low)) {
       resolveApproval(id, /approve/.test(low));
       return;
@@ -826,6 +830,7 @@ function sendChat(text) {
         .then(j => {
           const h = chatHist[id]; const k = h.findIndex(m => m.who === 'work' && m.text === `${r.a.name} is thinking`); if (k >= 0) h.splice(k, 1);
           chatPush(id, { who: 'agent', text: j.reply });
+          if (j.routines && tasks.refresh) tasks.refresh(); // a routine was set, paused, run or deleted in chat
           if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
           if (j.tools && j.tools.length) mcp.onToolsUsed(id, j.tools);
         })
@@ -920,16 +925,22 @@ function mockupFor(id) {
 }
 
 /* ---------- approvals: agent STUCK → amber billboard row → chat approval message ---------- */
-function requestApproval(id) {
+function requestApproval(id, ask) {
   const r = R[id];
   if (!r || r.state !== 'working') return;
   r.state = 'stuck';
-  r.ask = APPROVAL_BY_AGENT[id] || sample(APPROVAL_ASKS[r.a.dept], 1)[0];
+  r.ask = ask || APPROVAL_BY_AGENT[id] || sample(APPROVAL_ASKS[r.a.dept], 1)[0];
   r.warn.visible = true;
   const hadChat = !!chatHist[id]; // fresh chats already seed the deliverable card
   chatPush(id, { who: 'appr', text: r.ask, pending: true, mock: mockupFor(id) });
   if (FILE_GEN[id] && hadChat) chatPush(id, { who: 'file', ...FILE_GEN[id]() });
   if (tasks) tasks.onStuck(id, r.ask);
+  syncApprovals();
+}
+// V3.5: a routine's draft is waiting for the owner's OK — the agent stands and waves like any approval; the chat already holds the draft card
+function setStuckLive(id, ask, sid) {
+  const r = R[id]; if (!r) return;
+  r.state = 'stuck'; r.ask = ask; r.liveSid = sid; r.warn.visible = true;
   syncApprovals();
 }
 function resolveApproval(id, approved) {
@@ -944,6 +955,7 @@ function resolveApproval(id, approved) {
   const now = performance.now();
   if (approved) r.cheerUntil = now + 2400; else r.slumpUntil = now + 2600;
   spawnEmote(r, approved ? '✅' : '❌');
+  if (r.liveSid) { r.liveSid = null; if (tasks) tasks.resolveLive(id, approved); syncApprovals(); return; } // live: APPROVE sends, REJECT asks for the note
   if (tasks) tasks.onResolve(id, approved);
   chatPush(id, {
     who: 'agent',
@@ -1216,7 +1228,7 @@ function tickSim(now, dt) {
   brain.tick(now);
   // schedule a new approval request now and then — capped so a long unattended demo
   // never ends up with half the office stuck waving (v1 demo-safety rule)
-  if (now > nextApprovalAt) {
+  if (now > nextApprovalAt && !(tasks && tasks.isLive())) { // V3.5: a live office's approvals are real (routine drafts) — no theatre ones
     const pending = Object.values(R).filter(r => r.state === 'stuck').length;
     if (pending < 2) {
       const ids = Object.keys(R).filter(id => R[id].state === 'working' && !R[id].a.lead);
@@ -1328,12 +1340,15 @@ function applyRoster(agents) {
     if (chatHist[a.id] && chatHist[a.id][0] && chatHist[a.id][0].who === 'agent') chatHist[a.id][0].text = r.v1.greeting;
     if (modalOpen === a.id) openAgentRail(a.id, modalTab, false);
   }
+  if (tasks && tasks.syncPills) tasks.syncPills(); // the pills were rebuilt — put the clock chips back
 }
 tasks = initTasks({
   hud, R, deptRT, RAIL_SIDE, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, esc,
   brainWrite: (id, title) => brain.write(id, title), brain,
-  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = 'BETA'; document.title = `${h.name} — Agents Office`; brain.setOwner(h.name); applyRoster(h.agents); },
+  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = 'BETA'; document.title = `${h.name} — Agents Office`; brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
   onTools: (agentId, keys) => mcp.onToolsUsed(agentId, keys),
+  requestApproval, setStuck: setStuckLive,
+  onUsage: (u) => { if (mcp && mcp.setUsage) mcp.setUsage(u); }, // V3.6: the plan's gauge in the top bar
   getFocused: () => focused, getZoom: () => view.zoom, getFocusDim: () => focusDim,
   toScreen: (p) => toScreen(p), reframe,
 });
@@ -1366,7 +1381,7 @@ resize();
 }
 window.CC = { flyTo, zoomToDept, zoomOut, zoomToApproval, requestApproval, openAgent, view, applyCamera, R, emotes,
   setCam, setDark, brain, connectorReveal: () => mcp.startReveal(performance.now()),
-  toggleBoard: () => tasks.toggle(), addTask: (agentId, title) => tasks.addTask(agentId, title), tasks };
+  toggleBoard: () => tasks.toggle(), addTask: (agentId, title) => tasks.addTask(agentId, title), tasks, routines: () => tasks.routines };
 
 let last = performance.now();
 function loop(now) {

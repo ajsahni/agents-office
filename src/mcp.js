@@ -309,7 +309,28 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
     mwires[k] = { path, dot, port: [LAYOUT.brain.w / 2 - 2 - i * 4, 1.3, -LAYOUT.brain.d / 2] };
   });
   let nextModelPulse = performance.now() + 2600;
+  // V3.6 (A3 · B1 · C1): the plan's own gauge beside the Claude logo — session and week, as Claude Code shows them.
+  // Live means Claude only: the ChatGPT tile and its wire are demo theatre and go the first time usage arrives.
+  let usageEl = null;
+  function setUsage(u) {
+    if (!topmodels) return;
+    if (modelImgs.chatgpt) { modelImgs.chatgpt.remove(); delete modelImgs.chatgpt; const w = mwires.chatgpt; if (w) { w.path.setAttribute('d', ''); w.dot.setAttribute('opacity', 0); delete mwires.chatgpt; } }
+    if (!usageEl) { usageEl = document.createElement('span'); usageEl.className = 'tm-usage'; topmodels.appendChild(usageEl); }
+    const when = ts => ts ? new Date(ts).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
+    const bar = (lab, x) => { if (!x) return ''; const cls = x.percent >= 90 ? 'c' : x.percent >= 75 ? 'w' : ''; return `<span>${lab}</span><span class="ub"><i class="${cls}" style="width:${x.percent}%"></i></span><b>${x.percent >= 100 ? 'LIMIT' : x.percent + '%'}</b>`; };
+    if (u && u.ok && u.source === 'claude') {
+      usageEl.className = 'tm-usage';
+      usageEl.innerHTML = bar('SESSION', u.session) + (u.session && u.week ? '<span class="sep">·</span>' : '') + bar('WEEK', u.week);
+      usageEl.title = `Your Claude plan, as Claude Code shows it. Session resets ${when(u.session && u.session.resetsAt)} · week resets ${when(u.week && u.week.resetsAt)}.`;
+    } else if (u && u.ok && u.source === 'office') {
+      const w = u.window || {}; const n = w.tokens || 0; const tok = n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
+      usageEl.className = 'tm-usage off';
+      usageEl.innerHTML = `<span>THIS WINDOW</span><b>${tok}</b><span>TOKENS</span><span class="sep">·</span><b>${w.runs || 0}</b><span>RUNS</span>` + (w.resetsAt ? `<span class="sep">·</span><span>RESETS</span><b>${new Date(w.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b>` : '');
+      usageEl.title = `Claude's usage gauge is unavailable (${u.reason || 'no answer'}). This is the office's own count for the current five-hour window.`;
+    } else { usageEl.className = 'tm-usage off'; usageEl.innerHTML = '<span>USAGE UNAVAILABLE</span>'; usageEl.title = (u && u.reason) || ''; }
+  }
   function modelPulse(k, strong = false) {
+    if (!modelImgs[k]) return; // a tile that has gone (ChatGPT in a live office) has no wire to pulse
     wirePulse('brain', { model: k, scale: strong ? 1.2 : 0.9 });
     wirePulse('brain', { model: k, reverse: true, delay: 900, scale: strong ? 1 : 0.75 });
     if (modelImgs[k] && strong) { modelImgs[k].classList.remove('tpulse'); void modelImgs[k].offsetWidth; modelImgs[k].classList.add('tpulse'); }
@@ -381,17 +402,17 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
       const bow = f ? 30 : Math.min(170, 40 + Math.abs(ex - jx) * 0.25);
       w.path.setAttribute('d', `M ${jx} ${jy} C ${jx + side * bow * 0.35} ${jy + (ey - jy) * 0.4}, ` +
         `${ex + side * bow} ${ey - (ey - jy) * 0.45}, ${ex} ${ey}`);
-      w.offset -= dt * 13; // slow crawl toward the pod
+      w.offset -= dt * (f ? 13 : 6); // slow crawl toward the pod (slower still at rest)
       w.path.setAttribute('stroke-dashoffset', w.offset);
-      w.path.setAttribute('stroke-opacity', (f ? 0.8 : 0.5) * wireA);
+      w.path.setAttribute('stroke-opacity', (f ? 0.8 : 0.26) * wireA); // V3.5: at rest the loom is half as loud (AJ)
       w.path.setAttribute('stroke-width', f ? 2.2 : 1.6); // heavier in focus so the camera reads it
       w.branch.setAttribute('stroke-dashoffset', w.offset);
-      w.branch.setAttribute('stroke-opacity', (f ? 0.85 : 0.6) * wireA);
+      w.branch.setAttribute('stroke-opacity', (f ? 0.85 : 0.3) * wireA);
       w.branch.setAttribute('stroke-width', f ? 1.8 : 1.3);
       w.jdot.setAttribute('cx', jx); w.jdot.setAttribute('cy', jy);
-      w.jdot.setAttribute('opacity', 0.75 * wireA);
+      w.jdot.setAttribute('opacity', (f ? 0.75 : 0.38) * wireA);
       w.dot.setAttribute('cx', ex); w.dot.setAttribute('cy', ey);
-      w.dot.setAttribute('opacity', 0.85 * wireA);
+      w.dot.setAttribute('opacity', (f ? 0.85 : 0.45) * wireA);
     }
     // shared wiring: each shared logo drops to its own junction, then an INDEPENDENT
     // trunk-style conduit per using dept, ending at that connector's own socket on the pod
@@ -400,11 +421,11 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
       const gr = topImgs[key].getBoundingClientRect();
       const gx = (gr.left + gr.right) / 2, gsy = 50, gjy = sh.jy;
       sh.drop.setAttribute('d', `M ${gx} ${gsy} L ${gx} ${gjy}`);
-      sh.offset -= dt * 13;
+      sh.offset -= dt * (f ? 13 : 6);
       sh.drop.setAttribute('stroke-dashoffset', sh.offset);
-      sh.drop.setAttribute('stroke-opacity', 0.6 * wireA);
+      sh.drop.setAttribute('stroke-opacity', (f ? 0.6 : 0.3) * wireA);
       sh.jdot.setAttribute('cx', gx); sh.jdot.setAttribute('cy', gjy);
-      sh.jdot.setAttribute('opacity', 0.75 * wireA);
+      sh.jdot.setAttribute('opacity', (f ? 0.75 : 0.38) * wireA);
       for (const [dept, g] of Object.entries(sh.wires)) {
         if (f && dept !== f) { hideWire(g); continue; }
         const gp = f ? g.fport : g.port;
@@ -415,10 +436,10 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
         g.path.setAttribute('d', `M ${gx} ${gjy} C ${gx + side * bow * 0.35} ${gjy + (ey - gjy) * 0.4}, ` +
           `${ex + side * bow} ${ey - (ey - gjy) * 0.45}, ${ex} ${ey}`);
         g.path.setAttribute('stroke-dashoffset', sh.offset);
-        g.path.setAttribute('stroke-opacity', (f ? 0.75 : key === 'notion' ? 0.32 : 0.5) * wireA);
+        g.path.setAttribute('stroke-opacity', (f ? 0.75 : key === 'notion' ? 0.16 : 0.26) * wireA);
         g.path.setAttribute('stroke-width', f ? 2 : 1.4);
         g.dot.setAttribute('cx', ex); g.dot.setAttribute('cy', ey);
-        g.dot.setAttribute('opacity', 0.85 * wireA);
+        g.dot.setAttribute('opacity', (f ? 0.85 : 0.45) * wireA);
       }
     }
     // model wiring: Claude + ChatGPT logos → the Brain's back edge; they pulse on their own
@@ -429,11 +450,11 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
       v3.set(m.port[0], m.port[1], m.port[2]).project(cam);
       const ex = (v3.x * 0.5 + 0.5) * innerWidth, ey = (-v3.y * 0.5 + 0.5) * innerHeight;
       m.path.setAttribute('d', `M ${mx} ${msy} C ${mx} ${msy + (ey - msy) * 0.45}, ${ex + 40} ${ey - (ey - msy) * 0.35}, ${ex} ${ey}`);
-      m.offset = (m.offset || 0) - dt * 13;
+      m.offset = (m.offset || 0) - dt * (f ? 13 : 6);
       m.path.setAttribute('stroke-dashoffset', m.offset);
-      m.path.setAttribute('stroke-opacity', 0.45 * wireA);
+      m.path.setAttribute('stroke-opacity', (f ? 0.45 : 0.22) * wireA);
       m.dot.setAttribute('cx', ex); m.dot.setAttribute('cy', ey);
-      m.dot.setAttribute('opacity', 0.85 * wireA);
+      m.dot.setAttribute('opacity', (f ? 0.85 : 0.45) * wireA);
     }
     if (now > nextModelPulse) {
       modelPulse(Math.random() < 0.6 ? 'claude' : 'chatgpt');
@@ -728,5 +749,5 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
     }
     if (mwires.chatgpt) { mwires.chatgpt.path.setAttribute('stroke', ink); mwires.chatgpt.dot.setAttribute('fill', ink); }
   }
-  return { tick, sprites: [], onAgentEvent, onToolsUsed, showTip, startReveal, setDark, live: LIVE, keys: uniqKeys }; // sprites: none clickable — docks retired
+  return { tick, sprites: [], onAgentEvent, onToolsUsed, showTip, startReveal, setDark, setUsage, live: LIVE, keys: uniqKeys }; // sprites: none clickable — docks retired
 }

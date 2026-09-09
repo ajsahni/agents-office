@@ -167,6 +167,60 @@ then on. The file is plain Markdown and it is yours: reword a rule, delete a lin
 move a one-off up to make it a rule. When a rule is really a process, ask Claude Code to fold it
 into the skill.
 
+## Routines: the office runs on its own clock
+
+A routine is a task the office does by itself, on a timetable: every weekday at 08:00, every
+Monday, every hour. In this release routines are for **Emails, Accounting and Sales**; the
+other departments get them later, and say so if you try.
+
+Three ways to set one, all the same underneath:
+
+- **Type it in the bar with the time in the sentence.** `every weekday at 8am, triage the
+  inbox and tell me what needs me`. The hint line reads the schedule back before you press Add.
+  Or press **REPEAT** and pick a cadence and a time. Times are this machine's clock.
+- **Tell a department lead in chat.** "every Monday 9am, list the overdue invoices and draft the
+  reminders". The lead puts it on the right desk and reads the timetable back on `routines`;
+  `pause …`, `resume …`, `run … now` and `delete …` work with a few words from the name.
+- **Ask Claude Code.** Routines live in `<brain>/Agents Office/routines.json`; `CLAUDE.md` tells
+  Claude Code how to write one.
+
+Where they show: a **SCHEDULED** chip in the Task Status panel with a countdown on every routine
+and RUN NOW / PAUSE / DELETE on each; a next-up line under the chips; a SCHEDULED column on the
+company board (**B**); a clock chip on the agent's name pill and a routines strip at the top of
+their chat.
+
+What a routine may do alone: a routine that only reads (a triage, a list, a reconciliation) runs
+and lands in DONE like any task. A routine that would send, pay or change anything has **needs
+my OK** on by default: the agent prepares everything, the draft lands in the chat, the card moves
+to WAITING ON APPROVAL and the agent stands and waves. **APPROVE** and the agent does the
+outbound step with its tools; **REJECT**, say what should change, and it comes back reworked,
+and that correction is remembered. Switch the OK off per routine for the ones you trust.
+
+The clock lives in the server: `npm start` has to be running, but the page does not have to be
+open. A run missed while the machine was asleep or the office was off is caught up once when it
+comes back, marked LATE; never more than one catch-up per routine. Every firing is a line in the
+terminal and a task in the panel, so "did it run" is never a guess. For filming, `every 2
+minutes` is accepted, though the picker does not offer it.
+
+## Which model, and how much of your plan
+
+Every run names its model. Three, by name: **Sonnet**, **Opus**, **Fable**. Sonnet is the
+default for everything, including the routing call that names the agent. The menu beside REPEAT
+in the bar shows the office default; change it and it applies to the task you are typing (or the
+routine, with REPEAT on). Four places, one precedence: the task beats the routine beats the agent
+(a `model` field in the roster) beats the office default (`model` in `office.config.json`). Every
+card says which model ran and, if it was set above the default, where. Effort lives inside the
+name: Opus runs at high; nobody sees an effort setting.
+
+The top bar shows what your Claude plan has used, the way Claude Code's own usage screen shows
+it: **session** and **week**, a bar and a percentage, reset times on hover. It is read from the
+same place Claude Code reads it, with the login token Claude Code keeps on this machine (the
+keychain on macOS, `~/.claude/.credentials.json` elsewhere). The token is read into memory, sent
+only to Anthropic's usage endpoint, never logged and never written. That endpoint is not a
+documented one; when it does not answer, the gauge shows the office's own count for the current
+five-hour window instead, and says so on hover. No dollars anywhere: the office runs on the plan
+you already pay for, and the gauge is there to show it.
+
 ## Make it yours
 
 `office.config.json`:
@@ -180,7 +234,7 @@ into the skill.
   The sample brain in `brain/` is a small fictional studio so the office works out of the box.
   Point this at your own notes and rebuild (`node build.mjs`) or just restart the server.
 - **port** — where the office listens.
-- **model** — leave empty for your Claude Code default, or name a model.
+- **model** — `sonnet` (default), `opus` or `fable`. The office default; a routine, an agent or a task can set its own.
 
 Put private overrides in `office.config.local.json` (ignored by git).
 
@@ -192,7 +246,7 @@ every note they read, so your graph grows as the office works.
 | Key | Does |
 |---|---|
 | `1` to `6` | Marketing, Emails, Sales, Operations, Finance, Delivery |
-| `B` | The company board: every department, backlog to done |
+| `B` | The company board: every department, scheduled to done |
 | `G` | The Brain graph |
 | `C` | Chat with the department lead |
 | `X` | Send two agents to meet at the Brain |
@@ -221,8 +275,10 @@ first thing to run after any change.
 | `skills.mjs` · `skills/` | Skills: how a kind of work is done, bound to agents or departments (`<brain>/Agents Office/skills/` is yours) |
 | `learn.mjs` | Corrections from `revise: …` recorded per agent in `<brain>/Agents Office/feedback/`; standing rules go back into the prompt |
 | `onboard.mjs` | The lead's five-question set-up interview; writes briefs and a skill into the brain |
+| `src/models.js` · `usage.mjs` | The three models by name and their CLI flags; the usage gauge (Claude's numbers, the office's own count underneath) |
+| `routines.mjs` · `src/when.js` | Routines: the timetable in `<brain>/Agents Office/routines.json`, plain words → a schedule, the clock and the catch-up (run state in `data/routines.json`) |
 | `SKILLS.md` | The guide to briefs and skills |
-| `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, or change connectors in this folder |
+| `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, put a routine on the timetable, or change connectors in this folder |
 | `graph-build.mjs` | Reads your brain folder and lays out the graph |
 | `dist/command-centre-v2.html` | The office as one built file (`node build.mjs` from `src/`); the server serves it, or double-click it for the demo |
 | `brain/` | The sample brain |

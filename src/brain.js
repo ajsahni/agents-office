@@ -129,11 +129,13 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
     }
     fx.push({ sprite: s, line, born: performance.now() });
   }
+  let quiet = false; // V3.5 (AJ: "the alerts on the Brain are distracting"): a live office shows only REAL reads and writes — no theatre glints, no ambient pulse
+  function setQuiet(on) { quiet = !!on; }
   function read(agentId) {
     const a = agentOf(agentId); if (!a) return;
     const n = pickFor(a.dept);
     const r = getR()[agentId];
-    glint(n, r && r.seat, `${a.name} read ${n.id}`);
+    if (!quiet) glint(n, r && r.seat, `${a.name} read ${n.id}`);
     state.lastRead = { note: n.id, agent: a.name, ts: Date.now() };
     state.reads.set(n.id, { agent: a.name, ts: Date.now() });
     updateStrip();
@@ -176,7 +178,7 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
     updateStrip();
   }
   function tick(now) {
-    if (now > nextPulse) { flatPulse(nodes[0]); nextPulse = now + 6000; } // the mock's 6-second glint on the biggest hub
+    if (now > nextPulse && !quiet) { flatPulse(nodes[0]); nextPulse = now + 6000; } // the mock's 6-second glint on the biggest hub (demo only)
     for (let i = pulses.length - 1; i >= 0; i--) {
       const p = pulses[i], k = (now - p.born) / 2000;
       if (k >= 1) { scene.remove(p.m); p.m.material.dispose(); pulses.splice(i, 1); continue; }
@@ -312,5 +314,5 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
   addEventListener('resize', () => { if (openNow) draw(); });
 
   function setTheme(dark) { INK = dark ? '236,234,227' : '21,20,20'; etch(); }
-  return { read, readNote, write, setGraph, setTheme, setOwner, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
+  return { read, readNote, write, setGraph, setTheme, setOwner, setQuiet, tick, open, close, toggle, isOpen: () => openNow, state, get nodes() { return nodes; }, get links() { return links; } };
 }

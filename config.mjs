@@ -15,7 +15,7 @@ function readJSON(p) {
 export function loadConfig() {
   const base = readJSON(path.join(ROOT, 'office.config.json'));
   const local = readJSON(path.join(ROOT, 'office.config.local.json'));
-  const c = { name: 'Agents Office', brain: './brain', port: 4520, model: '', ...base, ...local };
+  const c = { name: 'Agents Office', brain: './brain', port: 4520, model: 'sonnet', ...base, ...local }; // V3.6: model = sonnet · opus · fable
   c.mcp = { allow: [], deny: [], departments: {}, ...(base.mcp || {}), ...(local.mcp || {}) };
   c.tools = { web: true, ...(base.tools || {}), ...(local.tools || {}) };
   if (process.env.AO_NAME) c.name = process.env.AO_NAME;

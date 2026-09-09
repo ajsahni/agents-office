@@ -14,11 +14,12 @@ import { V1 } from './src/v1data.js';
 export const FILE = path.join(ROOT, 'office.agents.json');
 export const LOCAL = path.join(ROOT, 'office.agents.local.json');
 export const brainFile = brainPath => path.join(brainPath, 'Agents Office', 'agents.json');
-const EDITABLE = ['name', 'role', 'does', 'tools', 'brief'];
+const EDITABLE = ['name', 'role', 'does', 'tools', 'brief', 'model'];
 const BRIEF_MAX = 2000;
+const MODELS = ['sonnet', 'opus', 'fable']; // V3.6: an agent's model, by name; empty = the office default
 
 export function defaults() {
-  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [], brief: '' }; });
+  return AGENTS.map(a => { const p = V1.find(x => x.id === a.id) || {}; return { id: a.id, department: a.dept, lead: !!a.lead, name: a.name, role: p.role || '', does: p.tagline || '', tools: [], brief: '', model: '' }; });
 }
 // returns { agents, problems } — problems are human sentences, never thrown
 export function validate(doc, base = defaults()) {
@@ -40,6 +41,10 @@ export function validate(doc, base = defaults()) {
     if (e.role !== undefined) a.role = String(e.role).trim().slice(0, 80);
     if (e.does !== undefined) a.does = String(e.does).trim().slice(0, 400);
     if (e.tools !== undefined) { if (!Array.isArray(e.tools)) problems.push(`"${e.id}": tools must be a list — ignored`); else a.tools = e.tools.map(String).map(s => s.trim()).filter(Boolean).slice(0, 12); }
+    if (e.model !== undefined) { // V3.6: sonnet · opus · fable, or empty for the office default
+      const m = String(e.model || '').toLowerCase().trim();
+      if (!m) a.model = ''; else if (MODELS.includes(m)) a.model = m; else problems.push(`"${e.id}": model must be sonnet, opus or fable (got "${e.model}") — kept ${a.model || 'the office default'}`);
+    }
     if (e.brief !== undefined) { // a string, or a list of lines
       const b = (Array.isArray(e.brief) ? e.brief.map(String).join('\n') : String(e.brief)).trim();
       if (b.length > BRIEF_MAX) problems.push(`"${e.id}": brief is over ${BRIEF_MAX} characters — trimmed (put the long version in a skill)`);

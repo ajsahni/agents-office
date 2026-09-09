@@ -7,8 +7,17 @@
 // bar · waiting: minutes waiting for AJ's tick · done: the time it finished. Company-wide
 // Kanban still lives on B. DOING / NEXT / DONE rows stay on every pod card.
 // Session-only theatre — nothing persists (AJ's call: gauge interest first).
+// V3.5 (AJ, 9 Sep 2026): ROUTINES — tasks on the office's own clock, Emails / Accounting / Sales
+// only this release. Set one in the bar ("every weekday at 8am, …" or the REPEAT picker), by
+// telling an agent in chat, or in <brain>/Agents Office/routines.json. Live: the server keeps the
+// clock, fires and runs them page or no page; this page polls and shows the card move
+// SCHEDULED → BACKLOG → IN PROGRESS → (WAITING ON APPROVAL) → DONE. A draft that needs the owner's
+// OK makes the agent stand and wave; APPROVE sends it, REJECT + a note reworks it. Demo (file://):
+// session-only routines fired by this tick.
 import { DEPTS, AGENTS, DEPT_KEYS } from './data.js';
 import { P, rnd, ri } from './v1data.js';
+import { parseWhen, describe, nextRun, fromPicker, untilText } from './when.js';
+import { MODEL_KEYS, MODELS, DEFAULT_MODEL, modelName, normModel, FROM_TEXT } from './models.js';
 
 const SEGMENTS = ['roofing', 'HVAC', 'dental', 'logistics', 'fitness', 'property', 'landscaping', 'legal'];
 
@@ -107,11 +116,11 @@ function span(ms) { // "4 min" · "1 h 12 m" · "3 h"
   return r ? `${h} h ${r} m` : `${h} h`;
 }
 const agentOf = id => AGENTS.find(a => a.id === id);
-const STATE_LABEL = { next: 'Backlog', doing: 'In progress', waiting: 'Waiting', done: 'Done' };
+const STATE_LABEL = { next: 'Backlog', doing: 'In progress', waiting: 'Waiting', done: 'Done', sched: 'Scheduled' };
 
 export function initTasks(ctx) {
   const { R, deptRT, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent,
-          getFocused, esc, brainWrite, brain, onLive, onTools } = ctx;
+          getFocused, esc, brainWrite, brain, onLive, onTools, requestApproval, setStuck, onUsage } = ctx;
   // LIVE mode (served by serve.mjs): the bar routes through Claude, agents produce real
   // deliverables saved as notes in the brain, and tasks persist. Opened as a file it stays demo.
   let live = false;
@@ -120,6 +129,15 @@ export function initTasks(ctx) {
 
   const tasks = [];
   let seq = 1;
+  // V3.5 routines. Live: the server's list (polled). Demo: session-only, fired by this tick.
+  const routines = []; let rseq = 1, polling = false, railAgent = null, railExp = false;
+  const RT_DEPTS = ['emails', 'fin', 'sales'];
+  const RT_NAMES = { emails: 'Emails', fin: 'Accounting', sales: 'Sales', marketing: 'Marketing', ops: 'Operations', delivery: 'Delivery' };
+  const rtRefuse = k => `Routines come to ${RT_NAMES[k] || k} in a later release. This release: Emails, Accounting and Sales.`;
+  const deptRoutines = k => routines.filter(r => r.dept === k);
+  const agentRoutines = id => routines.filter(r => r.agent === id);
+  const nextOf = list => list.filter(r => !r.paused && r.nextAt).sort((a, b) => a.nextAt - b.nextAt)[0];
+  const byNext = (a, b) => (a.paused ? Infinity : a.nextAt || Infinity) - (b.paused ? Infinity : b.nextAt || Infinity);
   const doneCount = Object.fromEntries(DEPT_KEYS.map(k => [k, 0]));
   const board = { open: false };
   let dirty = false, lastBadge = 0, lastBar = 0, lastAgo = 0;
@@ -152,7 +170,7 @@ export function initTasks(ctx) {
     return mk({ agent: id, title: pick(id), ...extra });
   }
   function start(t, now) {
-    t.state = 'doing'; t.startedAt = now; t.progress = 0; t.running = false; t.ready = false;
+    t.state = 'doing'; t.startedAt = now; t.progress = 0; t.running = !!t.srv; t.ready = false; // a server-run task (routine) is never started from here
     t.dur = 90000 + Math.random() * 150000; // 1.5–4 min: a few completions a minute across the office
     t.pausedAt = null;
     touch(t, 'started');
@@ -172,6 +190,7 @@ export function initTasks(ctx) {
     // demo: finished work becomes a note in the Brain — always for tasks you added, a quarter of the rest
     else if (brainWrite && (t.by === 'you' || Math.random() < 0.25)) brainWrite(t.agent, t.title);
     touch(t, 'done');
+    if (!t.live && t.routine && t.needsOk && requestApproval) requestApproval(t.agent, `"${t.title}" is ready — send it?`); // demo: a routine that needs the OK asks for it
     if (t.chain && t.chainI < t.chain.length - 1) { // hand the work to the next desk — it appears in their backlog
       const [nid, ntitle] = t.chain[t.chainI + 1];
       const nt = mk({ agent: nid, title: ntitle, chain: t.chain, chainI: t.chainI + 1, from: t.agent });
@@ -183,8 +202,8 @@ export function initTasks(ctx) {
   function deliver(t) {
     const a = agentOf(t.agent);
     chatPush(t.agent, { who: 'file', icon: t.error ? '⚠' : '📄', name: (t.note || slug(t.title)) + '.md',
-      meta: `${t.error ? 'could not complete' : 'delivered · saved to your brain'} · ${timeStr(t.doneAt)} · click to view`, content: t.result });
-    if (!t.error) chatPush(t.agent, { who: 'agent', text: `Done — "${t.title}" is ready above${t.read && t.read.length ? ` (I read ${t.read.slice(0, 3).join(', ')})` : ''}${t.used && t.used.length ? `. Used ${t.used.join(', ')}` : ''}. Say "revise: …" and I'll change it.` });
+      meta: `${t.error ? 'could not complete' : t.approved ? 'sent after your OK · saved to your brain' : 'delivered · saved to your brain'} · ${timeStr(t.doneAt)} · click to view`, content: t.result });
+    if (!t.error) chatPush(t.agent, { who: 'agent', text: `Done — "${t.title}"${t.routine ? ` (routine, ${t.when}${t.late ? ', ran late' : ''})` : ''} is ready above${t.read && t.read.length ? ` (I read ${t.read.slice(0, 3).join(', ')})` : ''}${t.used && t.used.length ? `. Used ${t.used.join(', ')}` : ''}. Say "revise: …" and I'll change it.` });
     feedPush(R[t.agent], '📄', `Delivered: ${t.title}`);
     if (brain && t.read) for (const n of t.read.slice(0, 2)) brain.readNote(t.agent, n);
   }
@@ -254,7 +273,27 @@ export function initTasks(ctx) {
     menu: panel.querySelector('.tp-menu'), input: panel.querySelector('.tp-in'), add: panel.querySelector('.tp-add'),
     hint: panel.querySelector('.tp-hint'), chips: panel.querySelector('.tp-chips'), rows: panel.querySelector('.tp-rows'),
     scope: panel.querySelector('.tp-scope'),
+    rep: panel.querySelector('.tp-rep'), repRow: panel.querySelector('.tp-rep-row'), cad: panel.querySelector('.tp-cad'), at: panel.querySelector('.tp-at'), okc: panel.querySelector('.tp-okc'), next: panel.querySelector('.tp-next'),
+    model: panel.querySelector('.tp-model'),
   };
+  // V3.6 (D2): the model menu — Sonnet · Opus · Fable. Shows the office default; change it and it applies to this task (or this routine, with REPEAT on)
+  let officeModel = DEFAULT_MODEL, modelTouched = false;
+  P_.model.innerHTML = MODEL_KEYS.map(k => `<option value="${k}">${MODELS[k].name.toUpperCase()}</option>`).join('');
+  P_.model.value = officeModel;
+  P_.model.addEventListener('change', () => { modelTouched = P_.model.value !== officeModel; P_.model.classList.toggle('set', modelTouched); updateHint(); });
+  P_.model.addEventListener('keydown', e => e.stopPropagation());
+  function setOfficeModel(k) { officeModel = normModel(k) || DEFAULT_MODEL; if (!modelTouched) P_.model.value = officeModel; }
+  const chosenModel = () => (modelTouched ? P_.model.value : null);
+  function resetModel() { modelTouched = false; P_.model.value = officeModel; P_.model.classList.remove('set'); }
+  const modelBit = t => t.modelUsed ? ` · ${modelName(t.modelUsed)}${t.modelFrom && t.modelFrom !== 'office' ? ' (' + FROM_TEXT[t.modelFrom] + ')' : ''}` : '';
+  // the REPEAT picker (B1): cadence + time; "needs my OK" defaults on (D1)
+  let repeat = false;
+  P_.cad.innerHTML = [['weekdays', 'Every weekday'], ['daily', 'Every day'], ['mon', 'Mondays'], ['tue', 'Tuesdays'], ['wed', 'Wednesdays'], ['thu', 'Thursdays'], ['fri', 'Fridays'], ['sat', 'Saturdays'], ['sun', 'Sundays'], ['hourly', 'Every hour, 9–5, weekdays']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  P_.rep.addEventListener('click', () => { repeat = !repeat; P_.rep.classList.toggle('on', repeat); P_.repRow.hidden = !repeat; updateHint(); if (repeat) P_.input.focus(); });
+  P_.cad.addEventListener('change', () => { P_.at.disabled = P_.cad.value === 'hourly'; updateHint(); });
+  P_.at.addEventListener('change', updateHint);
+  [P_.cad, P_.at, P_.okc].forEach(el => el.addEventListener('keydown', e => e.stopPropagation()));
+  const routineIntent = text => repeat ? { when: fromPicker(P_.cad.value, P_.at.value), text, picker: true } : parseWhen(text);
   let dept = 'marketing', filter = 'all';
   P_.menu.innerHTML = DEPT_KEYS.map(k => `<button data-k="${k}"><span class="dot" style="background:${DEPTS[k].chip}"></span>${DEPTS[k].name}</button>`).join('');
   P_.menu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { setDept(b.dataset.k); P_.menu.classList.remove('on'); P_.input.focus(); }));
@@ -281,15 +320,27 @@ export function initTasks(ctx) {
   function updateHint() {
     const text = P_.input.value.trim();
     if (!text) { P_.hint.innerHTML = ''; P_.hint.classList.remove('on'); return; }
+    const rt = routineIntent(text);
+    if (rt) { // a routine in the making: say the schedule back before Add is pressed
+      if (!RT_DEPTS.includes(dept)) { P_.hint.innerHTML = `<span class="tp-amber">${esc(rtRefuse(dept))}</span>`; P_.hint.className = 'tp-hint on'; return; }
+      const { agent: ra } = route(dept, rt.text || text);
+      const need = rt.needsDay ? 'which day? say "every Monday …"' : rt.needsTime ? 'what time? add "at 8am"' : null;
+      P_.hint.innerHTML = `<span class="tp-av" style="border-color:${DEPTS[ra.dept].chip};background:${DEPTS[ra.dept].chip}55">⏱</span>Routine · <b>${esc(describe(rt.when) || 'every week')}</b>` +
+        (need ? ` · <span class="tp-amber">${need}</span>` : live ? ' · Claude names the agent when you press Add' : ` · goes to <b>${ra.name}</b>`) + (rt.guessed ? ` · "${esc(rt.guessWord)}" taken as ${rt.when.at}` : '');
+      if (modelTouched) P_.hint.innerHTML += ` · <b>${modelName(P_.model.value)}</b> for this routine`;
+      P_.hint.className = 'tp-hint on'; return;
+    }
     const { agent: a, matched } = route(dept, text);
     const busy = agentTasks(a.id, 'doing').length > 0 || R[a.id].state === 'stuck';
     const chip = DEPTS[a.dept].chip;
     P_.hint.innerHTML = `<span class="tp-av" style="border-color:${chip};background:${chip}55">${a.name[0]}</span>` +
       (live ? `Probably <b>${a.name}</b> · Claude confirms when you press Add`
-            : `Goes to <b>${a.name}</b> · ${busy ? 'starts after their current job' : 'starts straight away'}${matched ? '' : ' · say more and I’ll pick a specialist'}`);
+            : `Goes to <b>${a.name}</b> · ${busy ? 'starts after their current job' : 'starts straight away'}${matched ? '' : ' · say more and I’ll pick a specialist'}`) +
+      (modelTouched ? ` · <b>${modelName(P_.model.value)}</b> for this task` : '');
     P_.hint.className = 'tp-hint on';
   }
-  P_.input.addEventListener('input', updateHint);
+  P_.input.addEventListener('input', () => { panel.querySelector('.tp-cmd').classList.toggle('typing', !!P_.input.value); updateHint(); });
+  P_.input.addEventListener('blur', () => { if (!P_.input.value) panel.querySelector('.tp-cmd').classList.remove('typing'); });
   P_.input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') submit(); if (e.key === 'Escape') P_.input.blur(); });
   P_.add.addEventListener('click', submit);
   function say(html, cls) { P_.hint.innerHTML = html; P_.hint.className = 'tp-hint on' + (cls ? ' ' + cls : ''); }
@@ -297,15 +348,19 @@ export function initTasks(ctx) {
     let title = P_.input.value.trim().replace(/[.!]+$/, '');
     if (!title) return;
     title = title.charAt(0).toUpperCase() + title.slice(1);
+    const rt = routineIntent(title);
+    if (rt) { await submitRoutine(rt, title); return; }
     if (live) {
       const text = title, k = dept;
       P_.input.value = ''; P_.input.disabled = true; P_.add.disabled = true;
       say(`Routing through Claude — ${DEPTS[k].name.toLowerCase()} is reading it…`, 'busy');
       try {
-        const r = await fetch(API + '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text }) });
+        const mdl = chosenModel();
+        const r = await fetch(API + '/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, model: mdl || undefined }) });
         if (!r.ok) throw new Error((await r.json()).error || r.statusText);
         const st = await r.json();
-        const t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, why: st.why, by: 'you', live: true, sid: st.id });
+        const t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, why: st.why, by: 'you', live: true, sid: st.id, model: st.model, modelUsed: st.model || officeModel, modelFrom: st.model ? 'task' : 'office' });
+        resetModel();
         touch(t, 'added'); spawnEmote(R[t.agent], '📋');
         say(`Added — <b>${agentOf(t.agent).name}</b> has it${st.why ? ' · ' + esc(st.why) : ''}`);
         setTimeout(() => { if (!P_.input.value) P_.hint.classList.remove('on'); }, 7000);
@@ -318,10 +373,152 @@ export function initTasks(ctx) {
     }
     const { agent: a } = route(dept, title);
     const t = addTask(a.id, title, 'you');
+    if (t) { const mdl = chosenModel(); t.modelUsed = mdl || officeModel; t.modelFrom = mdl ? 'task' : 'office'; }
+    resetModel();
     P_.input.value = ''; updateHint();
     if (t) { say(`Added — <b>${a.name}</b> has it.`); setTimeout(updateHint, 2600); P_.input.blur(); }
     else say(`<b>${a.name}</b> already has five queued — let one finish first.`);
   }
+  /* ---------- V3.5 routines: set one from the bar ---------- */
+  async function submitRoutine(rt, raw) {
+    const k = dept;
+    if (!RT_DEPTS.includes(k)) { say(`<span class="tp-amber">${esc(rtRefuse(k))}</span>`, 'err'); return; }
+    if (rt.needsDay) { say('Which day? Say "every Monday …" or "Mon and Thu …".', 'err'); return; }
+    if (rt.needsTime) { say('What time? Add "at 8am" or "at 17:30", or press REPEAT and pick one.', 'err'); return; }
+    const text = (rt.text || raw).trim().replace(/[.!]+$/, '');
+    if (!text) { say('What should happen? The sentence has a time but no task.', 'err'); return; }
+    if (live) {
+      P_.input.disabled = true; P_.add.disabled = true;
+      say('Setting the routine — Claude is naming the agent…', 'busy');
+      try {
+        const r = await fetch(API + '/routines', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: k, text, when: rt.when, needsOk: rt.picker ? P_.okc.checked : undefined, model: chosenModel() || undefined }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText);
+        setRoutines([...routines.filter(x => x.id !== j.routine.id), j.routine]);
+        const a = agentOf(j.routine.agent);
+        say(`Routine set — <b>${a.name}</b> · ${esc(j.routine.desc)} · next ${esc(untilText(j.routine.nextAt))}${j.routine.needsOk ? ' · waits for your OK' : ' · read-only, no OK needed'}${j.guessed ? ` · "${esc(j.guessed)}" taken as ${j.routine.when.at}` : ''}`);
+        P_.input.value = ''; resetModel(); spawnEmote(R[a.id], '⏱'); feedPush(R[a.id], '⏱', `New routine: ${j.routine.title} (${j.routine.desc})`);
+        filter = 'sched'; render(true); poll();
+      } catch (e) { say(`Claude couldn't set it (${esc(e.message)}).`, 'err'); }
+      P_.input.disabled = false; P_.add.disabled = false; P_.input.blur();
+      return;
+    }
+    const { agent: a } = route(k, text);
+    const r = addRoutine(k, a.id, text, rt.when, rt.picker ? P_.okc.checked : guessOk(text));
+    r.model = chosenModel() || undefined; resetModel();
+    P_.input.value = ''; say(`Routine set — <b>${a.name}</b> · ${esc(r.desc)} · next ${esc(untilText(r.nextAt))}${r.needsOk ? ' · waits for your OK' : ' · read-only'}`);
+    spawnEmote(R[a.id], '⏱'); feedPush(R[a.id], '⏱', `New routine: ${r.title} (${r.desc})`); filter = 'sched'; render(true); P_.input.blur(); setTimeout(updateHint, 5000);
+  }
+  function guessOk(text) { const t = text.toLowerCase(); return /\b(send|reply|chase|nudge|remind|post|publish|pay|book|draft|message|email)\b/.test(t) || !/\b(list|summari[sz]e|triage|tell me|what|report|match|reconcile|qualify|review|check|read|find|flag|count)\b/.test(t); }
+  function addRoutine(k, agentId, text, when, needsOk) { // demo: session-only
+    const title = (text.charAt(0).toUpperCase() + text.slice(1)).replace(/[.!]+$/, '').slice(0, 90);
+    const r = { id: 'r' + rseq++, dept: k, agent: agentId, title, text, when, desc: describe(when), needsOk: !!needsOk, paused: false, nextAt: nextRun(when), lastAt: null, runs: 0, live: false };
+    routines.push(r); syncPills(); dirty = true; if (railAgent === agentId) railFor(agentId);
+    return r;
+  }
+  function setRoutines(list) { routines.length = 0; for (const r of list) routines.push({ ...r, live: true }); syncPills(); dirty = true; if (railAgent) railFor(railAgent); }
+  function fireDemo(r, manual) {
+    const t = addTask(r.agent, r.title, 'routine');
+    if (t) { t.routine = r.id; t.when = r.desc; t.needsOk = r.needsOk; t.modelUsed = r.model || officeModel; t.modelFrom = r.model ? 'routine' : 'office'; spawnEmote(R[r.agent], '⏱'); feedPush(R[r.agent], '⏱', `Routine${manual ? ' (run now)' : ''}: ${r.title}`); }
+    r.lastAt = Date.now(); r.runs++; r.nextAt = nextRun(r.when);
+  }
+  async function rtAct(rid, act) { // RUN NOW · PAUSE · RESUME · DELETE — from a SCHEDULED row, a board card or the rail strip
+    const r = routines.find(x => x.id === rid); if (!r) return;
+    if (live) {
+      if (act === 'delete') await fetch(`${API}/routines/${rid}`, { method: 'DELETE' }).catch(() => {});
+      else { const j = await post(`/routines/${rid}/${act}`); if (act === 'run' && j && j.task) reconcile(j.task); }
+      if (act === 'run') { spawnEmote(R[r.agent], '⏱'); feedPush(R[r.agent], '⏱', `Run now: ${r.title}`); }
+      await poll(); return;
+    }
+    if (act === 'delete') routines.splice(routines.indexOf(r), 1);
+    else if (act === 'pause') { r.paused = true; r.nextAt = null; }
+    else if (act === 'resume') { r.paused = false; r.nextAt = nextRun(r.when); }
+    else if (act === 'run') fireDemo(r, true);
+    syncPills(); dirty = true; if (railAgent) railFor(railAgent);
+  }
+  const post = (p, b) => fetch(API + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.json()).catch(e => { console.warn('office:', e.message); return null; });
+  function syncPills() { // C2: the clock chip on the desk
+    for (const id in R) {
+      const n = agentRoutines(id).length, pill = R[id].pill; let s = pill.querySelector('.rt');
+      if (!n) { if (s) s.remove(); continue; }
+      if (!s) { s = document.createElement('span'); s.className = 'rt'; pill.appendChild(s); }
+      s.textContent = '⏱ ' + n;
+    }
+  }
+  function railFor(id) { // C2: the ROUTINES strip in the agent's rail — click to open, RUN NOW / PAUSE / DELETE per routine
+    railAgent = id;
+    const el = document.getElementById('mRt'); if (!el) return;
+    const mine = agentRoutines(id).sort(byNext);
+    el.hidden = !mine.length; if (!mine.length) { el.innerHTML = ''; return; }
+    const n = nextOf(mine);
+    el.className = 'mrt' + (railExp ? ' exp' : '');
+    el.innerHTML = `<div class="mrt-h"><span>⏱ ${mine.length} routine${mine.length > 1 ? 's' : ''}${n ? ' · next <b>' + esc(untilText(n.nextAt)) + '</b>' : ' · all paused'}</span><span class="car">▸</span></div>
+      <div class="mrt-l">${mine.map(r => `<div class="mrt-r" data-rid="${r.id}"><span>${esc(r.title)}</span><small>${esc(r.desc)} · ${modelName(r.model || officeModel)} · ${r.paused ? 'paused' : 'next ' + esc(untilText(r.nextAt))} · ${r.needsOk ? 'waits for your OK' : 'read-only'}</small>
+        <div class="tp-act"><button class="run" data-act="run">RUN NOW</button><button data-act="${r.paused ? 'resume' : 'pause'}">${r.paused ? 'RESUME' : 'PAUSE'}</button><button data-act="delete">DELETE</button></div></div>`).join('')}</div>`;
+    el.querySelector('.mrt-h').addEventListener('click', () => { railExp = !railExp; el.classList.toggle('exp', railExp); });
+    el.querySelectorAll('.tp-act button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); rtAct(b.closest('[data-rid]').dataset.rid, b.dataset.act); }));
+  }
+  /* ---------- V3.5 live: the page keeps up with a server that runs things on its own ---------- */
+  let pollN = 0, usageDue = true;
+  async function pollUsage(force) { // V3.6: the plan's gauge — every 30 s, and after every run
+    try { const u = await fetch(API + '/usage' + (force ? '?refresh=1' : '')).then(r => r.json()); if (onUsage) onUsage(u); } catch {}
+  }
+  async function poll() {
+    if (!live || polling) return; polling = true;
+    if (usageDue || ++pollN % 5 === 0) { usageDue = false; pollUsage(); }
+    try {
+      const [rl, tl] = await Promise.all([fetch(API + '/routines').then(r => r.json()), fetch(API + '/tasks').then(r => r.json())]);
+      if (Array.isArray(rl.routines)) setRoutines(rl.routines);
+      if (Array.isArray(tl)) for (const st of tl) reconcile(st);
+    } catch (e) { console.warn('office poll:', e.message); }
+    polling = false;
+  }
+  function reconcile(st) { // a server task the page did not start (a routine firing, a catch-up, an approval finishing) → the same cards, the same moves
+    if (!agentOf(st.agent)) return;
+    let t = tasks.find(x => x.live && x.sid === st.id);
+    if (!t) {
+      t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, by: st.by === 'routine' ? 'routine' : 'you', live: true, srv: !!st.routine, sid: st.id,
+        routine: st.routine, when: st.when, late: !!st.late, due: st.due, needsOk: !!st.needsOk, addedAt: st.addedAt, changedAt: st.addedAt, last: 'added',
+        model: st.model, modelUsed: st.modelUsed || st.model || undefined, modelFrom: st.modelFrom || (st.model ? 'task' : undefined) });
+      if (st.state !== 'done') { spawnEmote(R[t.agent], st.routine ? '⏱' : '📋'); if (st.routine) feedPush(R[t.agent], '⏱', `Routine fired: ${t.title}${t.late ? ' (late — was due ' + timeStr(t.due) + ')' : ''}`); }
+      touch(t, 'added');
+    }
+    apply(t, st);
+  }
+  function copyResult(t, st) { t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; t.draft = st.draft; t.approved = !!st.approved; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; } }
+  function apply(t, st) {
+    if (st.state === 'doing' && t.state !== 'doing') {
+      t.state = 'doing'; t.startedAt = performance.now() - Math.max(0, Date.now() - (st.startedAt || Date.now())); t.progress = 0; t.pausedAt = null; t.running = true; t.ready = false; t.srv = true; t.changedAt = st.startedAt || Date.now(); touch(t, 'started');
+    } else if (st.state === 'waiting' && t.draftAt !== st.waitingAt) { // a new draft is waiting for the OK (the first, or a rework after REJECT)
+      copyResult(t, st); t.state = 'waiting'; t.draftAt = st.waitingAt; t.ask = st.ask; t.changedAt = st.waitingAt || Date.now(); t.running = true; touch(t, 'waiting');
+      askApproval(t);
+    } else if (st.state === 'done' && t.state !== 'done') {
+      copyResult(t, st); t.ready = true; t.running = true; usageDue = true;
+      complete(t); t.doneAt = st.doneAt || t.doneAt; t.changedAt = t.doneAt; // straight to done here (the tick skips a stuck agent): the chat card, the note, the graph
+      if (t.tools.length && onTools) onTools(t.agent, t.tools);
+      if (brain && !t.error) fetch(API + '/brain').then(r => r.json()).then(g => brain.setGraph(g)).catch(() => {});
+    }
+  }
+  function askApproval(t) { // D1: the draft lands in the chat with APPROVE / REJECT and the agent stands and waves
+    chatPush(t.agent, { who: 'file', icon: '📝', name: slug(t.title) + '.md', meta: `draft · waiting for your OK · ${timeStr(t.changedAt)} · click to view`, content: t.draft || t.result });
+    chatPush(t.agent, { who: 'appr', text: t.ask || `"${t.title}" is ready — approve to send it, reject to tell me what to change.`, pending: true, live: true });
+    feedPush(R[t.agent], '⏸', `Waiting for your OK: ${t.title}`);
+    if (setStuck) setStuck(t.agent, t.ask, t.sid);
+  }
+  const pendingFeedback = {}; // agentId → sid after REJECT: the owner's next chat line is the note
+  function resolveLive(agentId, approved) { // APPROVE / REJECT on a live draft (main.js calls this instead of the demo onResolve)
+    const t = tasks.find(x => x.live && x.agent === agentId && x.state === 'waiting'); if (!t) return false;
+    if (approved) { post(`/tasks/${t.sid}/approve`); toDoing(t); chatPush(agentId, { who: 'agent', text: '✓ Approved — sending it now. It lands here when it is done.' }); }
+    else { pendingFeedback[agentId] = t.sid; chatPush(agentId, { who: 'agent', text: 'Understood. What should change? Tell me here and I will redo it — it comes back for your OK.' }); }
+    return true;
+  }
+  const pendingReject = agentId => !!pendingFeedback[agentId];
+  function rejectLive(agentId, feedback) {
+    const sid = pendingFeedback[agentId]; delete pendingFeedback[agentId];
+    const t = tasks.find(x => x.live && x.sid === sid); if (!t) return false;
+    post(`/tasks/${sid}/reject`, { feedback }); toDoing(t); chatPush(agentId, { who: 'agent', text: 'On it — reworking it with your note. It comes back here for your OK.' });
+    return true;
+  }
+  function toDoing(t) { t.state = 'doing'; t.startedAt = performance.now(); t.progress = 0; t.pausedAt = null; t.running = true; t.ready = false; t.srv = true; touch(t, 'started'); }
   // LIVE: the agent picks the task up → Claude does it on the server → the result lands in the chat
   async function runLive(t, feedback) {
     t.running = true; t.ready = false;
@@ -329,7 +526,8 @@ export function initTasks(ctx) {
       const r = await fetch(`${API}/tasks/${t.sid}/${feedback ? 'revise' : 'run'}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(feedback ? { feedback } : {}) });
       if (!r.ok) throw new Error((await r.json()).error || r.statusText);
       const st = await r.json();
-      t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || [];
+      t.result = st.result; t.error = !!st.error; t.read = st.read || []; t.note = st.note; t.tools = st.tools || []; t.used = st.used || []; if (st.modelUsed) { t.modelUsed = st.modelUsed; t.modelFrom = st.modelFrom; }
+      usageDue = true;
       if (t.tools.length && onTools) onTools(t.agent, t.tools); // the connectors the agent really pulled on light up
       if (brain && !t.error) fetch(API + '/brain').then(r => r.json()).then(g => brain.setGraph(g)).catch(() => {}); // the new note joins the graph
     } catch (e) { t.result = 'Could not complete this task: ' + e.message; t.error = true; }
@@ -347,9 +545,9 @@ export function initTasks(ctx) {
     try {
       const h = await (await fetch(API + '/health')).json();
       if (!h.ok) return;
-      live = true;
+      live = true; setOfficeModel(h.model);
       const mode = panel.querySelector('.tp-mode');
-      if (mode) { mode.hidden = false; mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${h.model} · brain: ${h.brain}`; }
+      if (mode) { mode.hidden = false; mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${modelName(h.model)} by default · brain: ${h.brain}`; }
       if (brain) { try { brain.setGraph(await (await fetch(API + '/brain')).json()); } catch {} }
       const list = await (await fetch(API + '/tasks')).json();
       for (const st of list) {
@@ -358,12 +556,11 @@ export function initTasks(ctx) {
           const t = mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, by: 'you', live: true, sid: st.id, state: 'done',
             doneAt: st.doneAt, changedAt: st.doneAt, addedAt: st.addedAt, result: st.result, read: st.read, note: st.note, tools: st.tools || [], used: st.used || [], error: !!st.error, last: 'done' });
           deliver(t);
-        } else { // waiting, or a run that was in flight when the page closed — pick it up again
-          mk({ agent: st.agent, title: st.title, text: st.text, plan: st.plan, by: 'you', live: true, sid: st.id, addedAt: st.addedAt, changedAt: st.addedAt, last: 'added' });
-        }
+        } else reconcile(st); // next, doing (the server may be running it), waiting for your OK — pick it up again
       }
       dirty = true;
       if (onLive) onLive(h);
+      await poll(); setInterval(poll, 6000); // V3.5: routines fire on the server's clock — the page keeps up
     } catch (e) { console.warn('office server not reachable — running offline:', e.message); }
   }
   connect();
@@ -375,10 +572,10 @@ export function initTasks(ctx) {
     return t;
   }
   // chips: filters with live counts
-  const CHIPS = [['all', 'All'], ['next', 'Backlog'], ['doing', 'In progress'], ['waiting', 'Waiting'], ['done', 'Done']];
+  const CHIPS = [['all', 'All'], ['sched', 'Scheduled'], ['next', 'Backlog'], ['doing', 'In progress'], ['waiting', 'Waiting'], ['done', 'Done']];
   function chipsHTML() {
     const scope = scoped();
-    const cnt = st => st === 'all' ? scope.length : scope.filter(t => t.state === st).length;
+    const cnt = st => st === 'all' ? scope.length : st === 'sched' ? scopedRoutines().length : scope.filter(t => t.state === st).length;
     return CHIPS.map(([st, lab]) => `<button class="tp-chip${filter === st ? ' on' : ''}${st === 'waiting' ? ' w' : ''}" data-f="${st}">${lab}<b>${cnt(st)}</b></button>`).join('');
   }
   P_.chips.addEventListener('click', (e) => { const b = e.target.closest('.tp-chip'); if (!b) return; filter = b.dataset.f; render(true); });
@@ -386,19 +583,20 @@ export function initTasks(ctx) {
     const f = getFocused();
     return (f && f !== 'brain') ? tasks.filter(t => t.dept === f) : tasks;
   }
+  function scopedRoutines() { const f = getFocused(); return (f && f !== 'brain') ? deptRoutines(f) : routines.slice(); }
   function metaFor(t) {
     const a = agentOf(t.agent), now = Date.now();
     const f = getFocused();
     const who = (f && f !== 'brain') ? a.name : `${a.name} · ${DEPTS[t.dept].short}`;
     switch (t.state) {
       case 'next': {
-        const src = t.by === 'you' ? (t.live ? 'added by you · live' : 'added by you') : t.last === 'handoff' && t.from ? `from ${agentOf(t.from).name}` : t.revised ? 'sent back to revise' : 'from the Brain';
+        const src = t.routine ? `routine · ${t.when}${t.late ? ' · <span class="tp-late">late · was due ' + timeStr(t.due) + '</span>' : ''}` : t.by === 'you' ? (t.live ? 'added by you · live' : 'added by you') : t.last === 'handoff' && t.from ? `from ${agentOf(t.from).name}` : t.revised ? 'sent back to revise' : 'from the Brain';
         const w = now - t.addedAt;
-        return `${who} · ${w < 60000 ? 'just added' : 'waiting ' + span(w)} · ${src}`;
+        return `${who} · ${w < 60000 ? 'just added' : 'waiting ' + span(w)} · ${src}${modelBit(t)}`;
       }
-      case 'doing': return `${who}${t.live ? ' · working with Claude' : t.agent === 'vid' ? ' · rendering' : ''}`;
-      case 'waiting': return `<span class="tp-amber">waiting ${span(now - t.changedAt)} for your tick</span> · ${who}`;
-      case 'done': return `${who} · done ${timeStr(t.doneAt)}${t.approved ? ' · approved' : ''}${t.live ? (t.error ? ' · <span class="tp-amber">failed</span>' : ' · <span class="tp-res">result ready →</span>') : ''}`;
+      case 'doing': return `${who}${t.live ? (t.approved === undefined && t.draftAt ? ' · sending with Claude' : ' · working with Claude') : t.agent === 'vid' ? ' · rendering' : ''}${t.routine ? ' · routine' : ''}${modelBit(t)}`;
+      case 'waiting': return `<span class="tp-amber">waiting ${span(now - t.changedAt)} for your tick</span> · ${who}${t.routine ? ' · routine draft' : ''}${modelBit(t)}`;
+      case 'done': return `${who} · done ${timeStr(t.doneAt)}${t.approved ? (t.live ? ' · sent after your OK' : ' · approved') : ''}${t.late ? ' · <span class="tp-late">ran late</span>' : ''}${modelBit(t)}${t.live ? (t.error ? ' · <span class="tp-amber">failed</span>' : ' · <span class="tp-res">result ready →</span>') : ''}`;
     }
     return who;
   }
@@ -407,8 +605,21 @@ export function initTasks(ctx) {
     const chip = `<span class="tp-st ${t.state}">${t.state === 'doing' ? `<span data-pct="${t.id}">${pct}%</span>` : STATE_LABEL[t.state]}</span>`;
     const bar = t.state === 'doing' ? `<div class="tp-bar"><i data-bar="${t.id}" style="width:${pct}%"></i></div>` : '';
     return `<div class="tp-row ${t.state}${t.last === 'handoff' ? ' handoff' : ''}${t.live ? ' live' : ''}" data-id="${t.id}" data-dept="${t.dept}" data-agent="${t.agent}">
-      ${chip}<div class="tp-body"><div class="tp-t">${esc(t.title)}</div><div class="tp-m">${metaFor(t)}</div>${bar}</div>
+      ${chip}<div class="tp-body"><div class="tp-t">${t.routine ? '⏱ ' : ''}${esc(t.title)}</div><div class="tp-m">${metaFor(t)}</div>${bar}</div>
       <span class="tp-ago" data-ago="${t.id}">${span(Date.now() - t.changedAt)}</span></div>`;
+  }
+  function rowHTMLr(r) { // a SCHEDULED row: the routine itself, with its countdown and its buttons
+    const a = agentOf(r.agent);
+    return `<div class="tp-row sched${r.paused ? ' paused' : ''}" data-id="r:${r.id}" data-rid="${r.id}" data-dept="${r.dept}" data-agent="${r.agent}">
+      <span class="tp-st sched">⏱</span>
+      <div class="tp-body"><div class="tp-t">${esc(r.title)}</div><div class="tp-m">${esc(r.desc)} · ${a.name} · ${modelName(r.model || officeModel)}${r.needsOk ? ' · waits for your OK' : ' · read-only'}${r.lastAt ? ' · last ' + timeStr(r.lastAt) + (r.lastLate ? ' <span class="tp-late">late</span>' : '') : ''}</div>
+      <div class="tp-act"><button class="run" data-act="run">RUN NOW</button><button data-act="${r.paused ? 'resume' : 'pause'}">${r.paused ? 'RESUME' : 'PAUSE'}</button><button data-act="delete">DELETE</button></div></div>
+      <span class="tp-ago" data-rago="${r.id}">${r.paused ? 'PAUSED' : esc(untilText(r.nextAt))}</span></div>`;
+  }
+  function renderNext() { // C1: the next-up strip under the chips
+    const n = nextOf(scopedRoutines());
+    P_.next.hidden = !n;
+    if (n) P_.next.innerHTML = `<span class="lab">NEXT ⏱</span><span class="nx">${esc(untilText(n.nextAt))}</span><span class="tt">${esc(n.title)} · ${agentOf(n.agent).name}</span>`;
   }
   function rects() {
     const m = {};
@@ -433,8 +644,11 @@ export function initTasks(ctx) {
     const list = scoped().filter(t => filter === 'all' || t.state === filter)
       .sort((a, b) => b.changedAt - a.changedAt).slice(0, 60);
     const before = structural ? {} : rects();
-    P_.rows.innerHTML = list.map(rowHTMLp).join('') ||
-      `<div class="tp-empty">Nothing here right now.</div>`;
+    P_.rows.innerHTML = filter === 'sched'
+      ? (scopedRoutines().sort(byNext).map(rowHTMLr).join('') || `<div class="tp-empty">No routines yet. Type one with a time in it — "every weekday at 8am, …" — or press REPEAT.${RT_DEPTS.includes(dept) ? '' : ' Emails, Accounting and Sales this release.'}</div>`)
+      : (list.map(rowHTMLp).join('') || `<div class="tp-empty">Nothing here right now.</div>`);
+    renderNext();
+    P_.rows.querySelectorAll('.tp-act button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); rtAct(b.closest('[data-rid]').dataset.rid, b.dataset.act); }));
     P_.rows.querySelectorAll('.tp-row.waiting').forEach(n => n.addEventListener('click', () => zoomToApproval(n.dataset.dept)));
     P_.rows.querySelectorAll('.tp-row.live.done').forEach(n => n.addEventListener('click', () => openAgent && openAgent(n.dataset.agent, 'chat')));
     if (!structural) flip(before);
@@ -456,6 +670,8 @@ export function initTasks(ctx) {
       const el = P_.rows.querySelector(`[data-ago="${t.id}"]`);
       if (el) el.textContent = span(now - t.changedAt);
     }
+    for (const r of routines) { const el = P_.rows.querySelector(`[data-rago="${r.id}"]`); if (el) el.textContent = r.paused ? 'PAUSED' : untilText(r.nextAt, now); }
+    renderNext();
     // waiting / backlog metas carry a duration too — cheap to re-render those lines
     P_.rows.querySelectorAll('.tp-row.waiting .tp-m, .tp-row.next .tp-m').forEach(m => {
       const t = tasks.find(x => x.id === +m.closest('.tp-row').dataset.id);
@@ -474,12 +690,12 @@ export function initTasks(ctx) {
     const pct = Math.round(t.progress * 100);
     const av = `<span class="tk-av" style="border-color:${chip};background:${chip}55">${a.name[0]}</span>`;
     let meta;
-    if (t.state === 'done') meta = `<span class="tk-tick">✓</span><span>${a.name}</span><span class="tk-pct">${t.approved ? 'APPROVED · ' : ''}${timeStr(t.doneAt)}</span>`;
+    if (t.state === 'done') meta = `<span class="tk-tick">✓</span><span>${a.name}</span><span class="tk-pct">${t.approved ? 'APPROVED · ' : ''}${t.modelUsed ? modelName(t.modelUsed).toUpperCase() + ' · ' : ''}${timeStr(t.doneAt)}</span>`;
     else if (t.state === 'waiting') meta = `${av}<span>${a.name}</span><span class="tk-chip">WAITING ${span(Date.now() - t.changedAt).toUpperCase()}</span>`;
     else if (t.state === 'doing') meta = `${av}<span>${a.name}</span><span class="tk-pct" data-pct="${t.id}">${t.agent === 'vid' ? 'RENDER · ' : ''}${pct}%</span>`;
     else meta = `${av}<span>${a.name}</span><span class="tk-pct">${span(Date.now() - t.addedAt).toUpperCase()} IN BACKLOG</span>`;
     return `<div class="tk ${t.state}${t.revised ? ' rev' : ''}" data-id="${t.id}" data-dept="${t.dept}">
-      <div class="tk-t">${esc(t.title)}</div><div class="tk-m">${meta}</div>
+      <div class="tk-t">${t.routine ? '⏱ ' : ''}${esc(t.title)}</div><div class="tk-m">${meta}</div>
       ${t.state === 'doing' ? `<div class="tk-bar"><i data-bar="${t.id}" style="width:${pct}%"></i></div>` : ''}</div>`;
   }
   const byState = (k, st) => {
@@ -489,20 +705,25 @@ export function initTasks(ctx) {
     else l.sort((a, b) => a.id - b.id);
     return l;
   };
-  const COLS = [['next', 'BACKLOG'], ['doing', 'IN PROGRESS'], ['waiting', 'WAITING ON APPROVAL'], ['done', 'DONE']];
+  function cardHTMLr(r) { // C1: a SCHEDULED card on the company board
+    const a = agentOf(r.agent), chip = DEPTS[r.dept].chip;
+    return `<div class="tk sched${r.paused ? ' paused' : ''}" data-rid="${r.id}" data-dept="${r.dept}"><div class="tk-t">⏱ ${esc(r.title)}</div>
+      <div class="tk-m"><span class="tk-av" style="border-color:${chip};background:${chip}55">${a.name[0]}</span><span>${a.name} · ${modelName(r.model || officeModel).toUpperCase()}</span><span class="tk-pct">${r.paused ? 'PAUSED' : esc(untilText(r.nextAt).toUpperCase())}</span></div></div>`;
+  }
+  const COLS = [['sched', 'SCHEDULED'], ['next', 'BACKLOG'], ['doing', 'IN PROGRESS'], ['waiting', 'WAITING ON APPROVAL'], ['done', 'DONE']];
   function companyHTML() {
     const tot = st => DEPT_KEYS.reduce((s, k) => s + deptTasks(k, st).length, 0);
     const doneAll = DEPT_KEYS.reduce((s, k) => s + doneCount[k], 0);
     return `<div class="bd-head">
         <span class="b-name"><span class="bd-title">Agents Office</span>Today's board</span>
-        <span class="bd-stats"><span>IN PROGRESS<b>${tot('doing')}</b></span><span>BACKLOG<b>${tot('next')}</b></span><span>WAITING<b>${tot('waiting')}</b></span><span>DONE<b>${doneAll}</b></span></span></div>
+        <span class="bd-stats"><span>SCHEDULED<b>${routines.length}</b></span><span>IN PROGRESS<b>${tot('doing')}</b></span><span>BACKLOG<b>${tot('next')}</b></span><span>WAITING<b>${tot('waiting')}</b></span><span>DONE<b>${doneAll}</b></span></span></div>
       <div class="bd-lanes"><div class="lh"></div>${COLS.map(([, lab]) => `<div class="lh">${lab}</div>`).join('')}
       ${DEPT_KEYS.map(k => {
         const d = DEPTS[k], n = AGENTS.filter(a => a.dept === k).length;
         return `<div class="ld"><span><span class="dot" style="background:${d.chip}"></span>${d.short}</span><b>${n} agents</b></div>` +
           COLS.map(([st]) => {
-            const list = byState(k, st), show = list.slice(0, 2);
-            return `<div class="lc">${show.map(cardHTML).join('')}${list.length > 2 ? `<div class="more">+${list.length - 2} more</div>` : ''}</div>`;
+            const list = st === 'sched' ? deptRoutines(k).sort(byNext) : byState(k, st), show = list.slice(0, 2);
+            return `<div class="lc">${show.map(st === 'sched' ? cardHTMLr : cardHTML).join('')}${list.length > 2 ? `<div class="more">+${list.length - 2} more</div>` : ''}</div>`;
           }).join('');
       }).join('')}</div>`;
   }
@@ -510,6 +731,7 @@ export function initTasks(ctx) {
     if (!board.open) return;
     el.innerHTML = companyHTML();
     el.querySelectorAll('.tk.waiting').forEach(n => n.addEventListener('click', () => { close(); zoomToApproval(n.dataset.dept); }));
+    el.querySelectorAll('.tk.sched').forEach(n => n.addEventListener('click', () => { close(); filter = 'sched'; openFor(n.dataset.dept); render(true); }));
   }
   function open() {
     board.open = true;
@@ -543,6 +765,24 @@ export function initTasks(ctx) {
 
   /* ---------- chat intake still works: "add task: …" in any agent's rail ---------- */
   function handleChat(agentId, text) {
+    if (!live) { // demo: "every weekday at 8am, …" · "routines" (live: the server handles these, so fall through)
+      const k0 = R[agentId].a.dept, a0 = R[agentId].a;
+      if (/^\s*(routines?|schedule|timetable)\s*\??\s*$/i.test(text)) {
+        if (!RT_DEPTS.includes(k0)) return rtRefuse(k0);
+        const mine = deptRoutines(k0).sort(byNext);
+        return mine.length ? `${RT_NAMES[k0]} routines:\n` + mine.map(r => `• ${r.title} — ${r.desc} · ${agentOf(r.agent).name}${r.paused ? ' · PAUSED' : ''}`).join('\n') : `Nothing on the ${RT_NAMES[k0]} timetable yet. Give me one with a time in it — "every weekday at 8am, …".`;
+      }
+      const p = parseWhen(text);
+      if (p) {
+        if (!RT_DEPTS.includes(k0)) return rtRefuse(k0);
+        if (p.needsDay) return 'Which day? Say it again with the day: "every Monday at 9am, …".';
+        if (p.needsTime) return 'What time? Say it again with the time, e.g. "every weekday at 8am, …".';
+        if (!p.text) return 'I have the time but not the task. Say it again with what should happen.';
+        const to = a0.lead ? route(k0, p.text).agent.id : agentId;
+        const r = addRoutine(k0, to, p.text, p.when, guessOk(p.text));
+        return `Done. ${r.desc.charAt(0).toUpperCase() + r.desc.slice(1)}, ${to === agentId ? 'I have it' : agentOf(to).name + ' has it'}. ${r.needsOk ? 'Anything to send waits for your OK first.' : 'It only reads, so it will not wait for you.'} Next run ${untilText(r.nextAt)}. Say "routines" to see the list.`;
+      }
+    }
     const m = text.match(/^\s*(?:add\s+(?:a\s+)?(?:new\s+)?task|new\s+task|task|todo)\s*[:\-–—]?\s*(.+)$/i);
     const k = R[agentId].a.dept;
     if (m) {
@@ -567,10 +807,12 @@ export function initTasks(ctx) {
 
   /* ---------- per-frame ---------- */
   function tick(now) {
+    if (!live) { const w = Date.now(); for (const r of routines) if (!r.paused && r.nextAt && r.nextAt <= w) fireDemo(r, false); } // demo: this page is the clock
     for (const id in R) {
       const r = R[id];
       if (r.state === 'stuck') continue;
       const d = agentTasks(id, 'doing')[0];
+      if (d && live && !d.live && agentTasks(id, 'next').some(t => t.live)) { d.progress = 1; complete(d); continue; } // live: real work never waits behind theatre
       if (d) {
         if (d.live) {
           if (!d.running) runLive(d);
@@ -596,5 +838,6 @@ export function initTasks(ctx) {
   }
 
   return { tick, toggle, open, close, openFor, isOpen, boardWidth, onFocusChange, onStuck, onResolve,
-           handleChat, addTask, revise, rowHTML, setDept, tasks, panelWidth: () => panel.offsetWidth, isLive: () => live };
+           handleChat, addTask, revise, rowHTML, setDept, tasks, panelWidth: () => panel.offsetWidth, isLive: () => live,
+           routines, addRoutine, rtAct, railFor, syncPills, refresh: poll, resolveLive, pendingReject, rejectLive, officeModel: () => officeModel, chosenModel };
 }

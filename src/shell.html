@@ -528,7 +528,7 @@
   .tk-in { animation: tkin .5s var(--ease); }
   @keyframes tkin { from { opacity: 0; transform: translateY(8px); } }
   /* company board lanes */
-  .bd-lanes { display: grid; grid-template-columns: 108px repeat(4, 1fr); gap: 3px 12px; align-content: start;
+  .bd-lanes { display: grid; grid-template-columns: 108px repeat(5, 1fr); gap: 3px 12px; align-content: start;
     flex: 1; min-height: 0; overflow: hidden; }
   .bd-lanes .lh { font-size: 8.5px; letter-spacing: .16em; color: var(--ink); font-weight: 500;
     border-bottom: 1px solid var(--hairline); padding-bottom: 5px; }
@@ -657,6 +657,61 @@
   .tp-row.tp-new { animation: tpin .55s var(--ease); }
   @keyframes tpin { from { opacity: 0; transform: translateY(-10px); } }
   .tp-empty { font-family: var(--serif); font-style: italic; color: var(--grey); padding: 18px 4px; font-size: 14px; }
+  /* V3.5 routines: the REPEAT toggle + picker, the next-up strip, SCHEDULED rows and cards, the rail strip, the desk chip */
+  .tp-rep { font-family: var(--ui); font-size: 9px; letter-spacing: .14em; font-weight: 700; background: none; border: 1px solid var(--hairline); color: var(--grey);
+    border-radius: 99px; padding: 5px 9px; cursor: pointer; white-space: nowrap; transition: all .3s var(--ease); }
+  .tp-rep:hover { border-color: var(--ink); color: var(--ink); }
+  .tp-rep.on { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .tp-rep-row { display: flex; gap: 6px; align-items: center; margin: -2px 0 6px; }
+  .tp-rep-row[hidden], .tp-next[hidden], .mrt[hidden] { display: none; }
+  .tp-model { font-family: var(--ui); font-size: 8.5px; letter-spacing: .1em; font-weight: 700; text-transform: uppercase; color: var(--grey); background: none;
+    border: 0; border-left: 1px solid var(--hairline); border-radius: 0; padding: 4px 2px 4px 7px; cursor: pointer; max-width: 70px; flex: none; }
+  .tp-model.set { color: var(--ink); }
+  .tp-cmd .tp-rep { font-size: 8.5px; padding: 4px 7px; }
+  .tp-cmd .tp-add { padding: 6px 10px; font-size: 9.5px; }
+  .tp-cmd.typing .tp-ddn { display: none; } /* while a task is being typed the department shows as its dot — the hint line names the agent */
+  /* V3.6 the usage gauge, top bar: SESSION [bar] 29% · WEEK [bar] 39% — the plan's own numbers */
+  .tm-usage { display: flex; align-items: center; gap: 6px; margin-left: 8px; font-family: var(--ui); font-size: 8.5px; letter-spacing: .14em; font-weight: 700; color: var(--grey); white-space: nowrap; cursor: default; }
+  .tm-usage b { font-family: var(--serif); font-weight: 400; font-size: 13px; letter-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tm-usage .ub { width: 46px; height: 4px; border-radius: 99px; background: rgba(21,20,20,.12); overflow: hidden; }
+  .tm-usage .ub i { display: block; height: 100%; background: var(--ink); border-radius: 99px; transition: width .6s var(--ease); }
+  .tm-usage .ub i.w { background: #B4830B; } .tm-usage .ub i.c { background: #B4391E; }
+  .tm-usage .sep { color: var(--hairline); }
+  .tm-usage.off { opacity: .7; }
+  body.dark .tp-model { border-color: var(--hairline); color: var(--grey); background: #1B1C21; }
+  body.dark .tp-model.set { color: var(--ink); border-color: var(--ink); }
+  body.dark .tm-usage .ub { background: rgba(236,234,227,.16); }
+  .tp-rep-row select, .tp-rep-row input[type=time] { font-family: var(--ui); font-size: 10.5px; letter-spacing: .04em; color: var(--ink); background: #fff;
+    border: 1px solid var(--hairline); border-radius: 8px; padding: 5px 7px; }
+  .tp-rep-row select { flex: 1; min-width: 0; }
+  .tp-ok { display: flex; align-items: center; gap: 4px; font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); white-space: nowrap; cursor: pointer; }
+  .tp-ok input { margin: 0; accent-color: var(--ink); }
+  .tp-next { display: flex; align-items: baseline; gap: 7px; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); padding: 3px 2px 0;
+    white-space: nowrap; overflow: hidden; }
+  .tp-next .lab { font-weight: 700; color: var(--ink); flex: none; }
+  .tp-next .nx { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+  .tp-next .tt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tp-row.sched, .tk.sched { border-style: dashed; }
+  .tp-row.sched.paused, .tk.sched.paused { opacity: .55; }
+  .tp-st.sched { border-style: dashed; color: var(--ink); }
+  .tp-act { display: flex; gap: 5px; margin-top: 7px; }
+  .tp-act button { font-family: var(--ui); font-size: 8.5px; letter-spacing: .12em; font-weight: 700; border: 1px solid var(--hairline); background: none; color: var(--grey);
+    border-radius: 99px; padding: 4px 8px; cursor: pointer; transition: all .3s var(--ease); }
+  .tp-act button:hover { border-color: var(--ink); color: var(--ink); }
+  .tp-act button.run { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .tp-act button.run:hover { background: #000; }
+  .tp-late { color: #B4830B; font-weight: 600; }
+  .pill .rt { margin-left: 6px; font-size: 9px; letter-spacing: .06em; color: var(--grey); }
+  .mrt { margin: 6px 18px 0; border: 1px dashed var(--hairline); border-radius: 10px; padding: 7px 10px; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); }
+  .mrt-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; cursor: pointer; }
+  .mrt-h b { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .mrt-h .car { flex: none; transition: transform .3s var(--ease); }
+  .mrt.exp .mrt-h .car { transform: rotate(90deg); }
+  .mrt-l { display: none; flex-direction: column; gap: 8px; margin-top: 8px; text-transform: none; letter-spacing: 0; }
+  .mrt.exp .mrt-l { display: flex; }
+  .mrt-r { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--ink); line-height: 1.3; }
+  .mrt-r small { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); }
+  .mrt-r .tp-act { margin-top: 3px; }
 
 
   /* ---------- V3.6: the read pill over a note ("CLIENT EMAILS READ MOC-DELIVERY") ---------- */
@@ -756,6 +811,9 @@
   body.dark .tp-bar, body.dark .tk-bar { background: rgba(236,234,227,.12); }
   body.dark .tp-bar i, body.dark .tk-bar i { background: var(--ink); }
   body.dark .tp-row.waiting, body.dark .tk.waiting, body.dark .m-appr { background: rgba(242,184,75,.12); }
+  body.dark .tp-rep-row select, body.dark .tp-rep-row input[type=time] { background: #1B1C21; color: var(--ink); border-color: var(--hairline); }
+  body.dark .tp-rep.on, body.dark .tp-act button.run { background: var(--ink); color: #15161A; border-color: var(--ink); }
+  body.dark .tp-rep, body.dark .tp-act button, body.dark .mrt { border-color: var(--hairline); }
   body.dark .badge.sweepglow { box-shadow: 0 0 0 1.5px var(--sw), 0 14px 44px -8px var(--sw), 0 12px 30px rgba(0,0,0,.4); }
   body.dark .m-file pre { background: #0F1013; }
   body.dark #zoomCtl button { background: #1E1F24; color: var(--ink); border-color: var(--hairline); }
@@ -801,6 +859,7 @@
       </div>
     </div>
     <div class="mh-tag"></div>
+    <div id="mRt" class="mrt" hidden></div>
     <div class="mtabs">
       <button data-tab="chat" class="on">CHAT</button>
       <button data-tab="activity">ACTIVITY</button>
@@ -809,7 +868,7 @@
       <div id="mMsgs"></div>
       <div id="mChips"></div>
       <div class="mInput">
-        <input id="mIn" placeholder="Message this agent… (add task: … · approve / reject)" autocomplete="off">
+        <input id="mIn" placeholder="Message this agent… (add task: … · every weekday at 8am, … · approve / reject)" autocomplete="off">
         <button id="mSend">SEND</button>
       </div>
     </div>
@@ -838,11 +897,19 @@
     <button class="tp-dd" title="department"><span class="dot"></span><span class="tp-ddn">MARKETING</span></button>
     <div class="tp-menu"></div>
     <input class="tp-in" placeholder="Type a task…" autocomplete="off" spellcheck="false">
+    <select class="tp-model" title="which model runs this (the office default unless you change it)"></select>
+    <button class="tp-rep" title="repeat on a schedule (or just say when: every weekday at 8am, …)">REPEAT</button>
     <button class="tp-add">ADD</button>
+  </div>
+  <div class="tp-rep-row" hidden>
+    <select class="tp-cad" title="how often"></select>
+    <input type="time" class="tp-at" value="08:00" title="at what time (this machine's clock)">
+    <label class="tp-ok" title="the result waits for your approval before anything is sent"><input type="checkbox" class="tp-okc" checked> needs my OK</label>
   </div>
   <div class="tp-hint"></div>
   <div class="tp-head"><span class="tp-lab">TASK STATUS <span class="tp-mode" hidden></span></span><span class="tp-scope">WHOLE OFFICE</span></div>
   <div class="tp-chips"></div>
+  <div class="tp-next" hidden></div>
   <div class="tp-rows"></div>
 </div>
 <div id="zoomCtl">

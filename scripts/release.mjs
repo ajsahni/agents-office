@@ -22,7 +22,7 @@ const OUT = path.join(ROOT, 'dist', 'release');
 
 const FILES = ['src', 'assets/mcp/tiles', 'assets/mcp/bake.py', 'assets/mcp/rebake.py', 'brain', 'scripts/release.mjs',
   'build.mjs', 'graph-build.mjs', 'serve.mjs', 'config.mjs', 'mcp.mjs', 'roster.mjs', 'check.mjs', 'setup', 'package.json', 'package-lock.json',
-  'office.config.json', 'office.agents.json', 'skills.mjs', 'skills', 'learn.mjs', 'onboard.mjs', 'CLAUDE.md', 'README.md', 'SKILLS.md', 'CHANGELOG.md', 'LICENSE', 'assets/readme-hero.jpg'];
+  'office.config.json', 'office.agents.json', 'skills.mjs', 'skills', 'learn.mjs', 'onboard.mjs', 'routines.mjs', 'usage.mjs', 'CLAUDE.md', 'README.md', 'SKILLS.md', 'CHANGELOG.md', 'LICENSE', 'assets/readme-hero.jpg'];
 
 const run = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8', ...opts }); if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`); return r.stdout; };
 

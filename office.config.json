@@ -2,7 +2,7 @@
   "name": "Northgate Studio",
   "brain": "./brain",
   "port": 4520,
-  "model": "",
+  "model": "sonnet",
   "mcp": { "allow": [], "deny": [], "departments": {} },
   "tools": { "web": true }
 }
