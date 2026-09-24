@@ -454,7 +454,11 @@ await rebuildGraph();
 const discovering = mcp.discover().then(l => { console.log(`  connectors: ${l.filter(s => s.status === 'connected').length} connected of ${l.length} (claude mcp list)`); return l; });
 const agentsOut = () => { const setup = setupMap(); return AGENTS.map(a => ({ id: a.id, name: a.name, role: a.role, does: a.does, tools: a.tools, brief: a.brief || '', model: a.model || '', effort: a.effort || '', skills: skills.names(a), lessons: learn.count(BRAIN, a.id), department: a.department, lead: a.lead,
   interviewer: leadOf(a.department).id === a.id, setUp: setup[a.department] })); };
+// this Mac's own page only (the office has no login): Host stops DNS rebinding, Origin stops other websites (CSRF)
+const LOCAL_HOSTS = [`localhost:${cfg.port}`, `127.0.0.1:${cfg.port}`];
+const isLocalRequest = ({ headers: { host, origin } }) => LOCAL_HOSTS.includes(host) && (!origin || LOCAL_HOSTS.some(h => origin === `http://${h}`));
 const server = http.createServer(async (req, res) => {
+  if (!isLocalRequest(req)) { console.warn(`  blocked ${req.method} ${req.url} · host ${req.headers.host || '-'} · origin ${req.headers.origin || '-'}`); return json(res, 403, { error: 'this office only answers its own page on this Mac' }); }
   const url = new URL(req.url, 'http://x');
   try {
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/command-centre-v2.html' || url.pathname === '/dark')) {
@@ -568,7 +572,7 @@ const server = http.createServer(async (req, res) => {
     json(res, 404, { error: 'not found' });
   } catch (e) { console.error(e); json(res, 500, { error: e.message }); }
 });
-server.listen(cfg.port, () => {
+server.listen(cfg.port, '127.0.0.1', () => { // this Mac only: the office has no login, so the network must not reach it
   console.log(`Agents Office ${version} → http://localhost:${cfg.port}`);
   console.log(`  business: ${cfg.name}   brain: ${BRAIN} (${graph.notes} notes, ${graph.links.length} links)   claude: ${backend} · ${modelName(cfg.model)}${cfg.effort ? ' · effort ' + cfg.effort : ''} by default (routing on Sonnet)`);
   getUsage(true).then(u => console.log(u.source === 'claude' ? `  usage: session ${u.session?.percent ?? '—'}% · week ${u.week?.percent ?? '—'}% (your Claude plan, as Claude Code shows it)` : `  usage: Claude's gauge unavailable (${u.reason}) — showing the office's own count`)).catch(() => {});

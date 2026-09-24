@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 function readJSON(p) {
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return {}; }
+  if (!fs.existsSync(p)) return {}; // no file, nothing to override
+  const text = fs.readFileSync(p, 'utf8');
+  try { return JSON.parse(text); } catch (e) { throw new Error(`${path.basename(p)} is not valid JSON (${e.message}) — fix it and start again`); } // fail closed: a typo must not quietly drop a setting such as the mcp allow-list
 }
 
 export function loadConfig() {
