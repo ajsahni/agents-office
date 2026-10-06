@@ -387,3 +387,4 @@ plus the agent's brief, skills and standing rules from your corrections).
 When an agent calls a connector, that call goes to that service through your own Claude Code
 login, exactly as it would if you called it yourself. Nothing else leaves your machine.
 Deliverables are saved locally.
+[![CodeRabbit Pull Request Reviews](https://shields.io)](https://coderabbit.ai)
