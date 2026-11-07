@@ -4897,14 +4897,19 @@
         #hexnav,
         #topSettings,
         #board,
-        #rail {
+        #rail,
+        #tpanel {
           top: 114px;
         }
         #board.company {
           top: 112px;
         }
-        /* the centred honeycomb comes down over this panel at these widths, so
-           the panel starts underneath it — the composer must stay clickable */
+      }
+
+      /* Narrower than this the centred honeycomb reaches sideways over the
+         right-hand panel, so the panel starts underneath it — the composer has
+         to stay clickable even though that costs some height. */
+      @media (max-width: 1100px) {
         #tpanel {
           top: 240px;
         }
