@@ -170,7 +170,7 @@
          loop still find their elements. */
       #topbar {
         position: fixed;
-        top: 10px;
+        top: 8px;
         left: 14px;
         right: 14px;
         height: 52px;
@@ -1133,7 +1133,7 @@
           display: none !important;
         }
         #overviewBtn {
-          top: 110px;
+          top: 118px;
         }
       }
       @media (max-width: 950px) {
@@ -4887,6 +4887,27 @@
           0 0 12px var(--cream),
           0 0 2px var(--cream);
         will-change: transform, opacity;
+      }
+
+      /* The bar itself goes two rows tall once the window narrows (98px), so
+         everything that hangs off it starts below the whole bar instead of
+         tucking under it and covering the task panel's composer. Declared here,
+         after the base offsets, so it wins on source order too. */
+      @media (max-width: 1400px) {
+        #hexnav,
+        #topSettings,
+        #board,
+        #rail {
+          top: 114px;
+        }
+        #board.company {
+          top: 112px;
+        }
+        /* the centred honeycomb comes down over this panel at these widths, so
+           the panel starts underneath it — the composer must stay clickable */
+        #tpanel {
+          top: 240px;
+        }
       }
     </style>
   </head>
