@@ -26,6 +26,15 @@ function toast(message) {
   document.querySelector('#toast').textContent = message;
   toastTimer = setTimeout(() => (document.querySelector('#toast').textContent = ''), 4500);
 }
+// Where to land after signing in. `?next=` wins, but only when it is a path on
+// this site: an absolute URL there would turn the sign-in form into a redirect
+// to somebody else's page.
+function nextPath() {
+  const raw = new URLSearchParams(location.search).get('next');
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/workspace';
+  if (['/login', '/signup'].includes(raw.split('#')[0])) return '/workspace';
+  return raw;
+}
 async function api(route, method = 'GET', body) {
   const res = await fetch('/api/account/' + route, {
     method,
@@ -87,7 +96,7 @@ function authPage(signup) {
     form.querySelector('.form-error').textContent = '';
     try {
       await api(signup ? 'signup' : 'login', 'POST', Object.fromEntries(new FormData(form)));
-      location.assign('/workspace');
+      location.assign(nextPath());
     } catch (err) {
       form.querySelector('.form-error').textContent = err.message;
       button.disabled = false;
@@ -309,7 +318,19 @@ function settings() {
 async function start() {
   const route = location.pathname;
   if (['/', '/index.html', '/luxury'].includes(route)) return landing();
-  if (['/signup', '/login'].includes(route)) return authPage(route === '/signup');
+  if (['/signup', '/login'].includes(route)) {
+    authPage(route === '/signup');
+    // Someone who already has a session should not be asked to sign in again —
+    // send them on to where they were headed. Without this, opening /login from
+    // the office (or pressing Back after signing in) shows the form a second time.
+    try {
+      setUser((await api('me')).user);
+      location.replace(nextPath());
+    } catch {
+      // not signed in — the form above is the right place to be
+    }
+    return;
+  }
   app.innerHTML = `${header()}<main id="main" class="wrap loading"><h1>A moment of clarity…</h1><p>Opening your workspace.</p></main>`;
   try {
     setUser((await api('me')).user);
@@ -320,7 +341,8 @@ async function start() {
     }
   } catch (err) {
     if (err.status === 401) {
-      location.replace('/login');
+      // Come back to this page once they have signed in.
+      location.replace('/login?next=' + encodeURIComponent(route));
       return;
     }
     app.innerHTML = `${header()}<main id="main" class="wrap loading"><h1>We couldn’t open your workspace.</h1><p>${esc(err.message)}</p><button class="button" id="retry">Try again</button></main>`;

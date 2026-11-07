@@ -29,6 +29,10 @@ const PRESETS = {
 // Pairing recipes. The agents get tools from Claude Code, so a connector is
 // added there; the office then shows it on the bar. n8n is the one people ask
 // for most, so it is first.
+// Signing in from the office returns you to the office, not to the portal's
+// workflow board. The portal reads `next` and only follows same-site paths.
+const SIGN_IN = '/login?next=%2Foffice';
+
 const PAIRING = [
   { name: 'n8n', hint: 'n8n MCP server', cmd: 'claude mcp add n8n http://localhost:5678/mcp' },
   { name: 'Gmail', hint: 'Google, via Claude in Chrome or the Gmail server', cmd: 'claude mcp add gmail' },
@@ -80,7 +84,7 @@ export function initTopbar() {
   /* ---------------------------------------------------------------- profile */
   function sectionAppearance() {
     if (!user) {
-      return `<section class="gp-section"><h3>Appearance</h3><p class="gp-note">Sign in to save a palette to your account. Until then the office uses its own colours.</p><p><a class="gp-link" href="/login">Sign in ↗</a></p></section>`;
+      return `<section class="gp-section"><h3>Appearance</h3><p class="gp-note">Sign in to save a palette to your account. Until then the office uses its own colours.</p><p><a class="gp-link" href="${SIGN_IN}">Sign in ↗</a></p></section>`;
     }
     const t = user.theme;
     return `<section class="gp-section" id="gpAppearance"><h3>Appearance</h3>
@@ -149,7 +153,7 @@ export function initTopbar() {
       <div class="gp-actions">
         <a class="gp-ghost" href="/workspace">Workspace</a>
         <a class="gp-ghost" href="/settings">Settings</a>
-        ${user ? '<button type="button" class="gp-ghost" id="gpLogout">Sign out</button>' : '<a class="gp-ghost" href="/login">Sign in</a>'}
+        ${user ? '<button type="button" class="gp-ghost" id="gpLogout">Sign out</button>' : `<a class="gp-ghost" href="${SIGN_IN}">Sign in</a>`}
       </div>
       <p class="gp-note">Office keys — B board · G brain · P calendar · 1–6 departments · D dark · V full screen · Esc back.</p>
     </section>`;
@@ -168,7 +172,7 @@ export function initTopbar() {
       e.target.disabled = true;
       try {
         await account('logout', 'POST');
-        location.assign('/login');
+        location.assign(SIGN_IN);
       } catch (err) {
         status('gpThemeStatus', err.message);
       }
