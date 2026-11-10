@@ -1,6 +1,7 @@
 // Agents Office v2 — Three.js isometric office with zoom-driven LOD
 // Far: clean pods + agent counts (Image 1 read). Near: diorama with 3D people + holo screens (Image 2 read).
 import * as THREE from 'three';
+import './i18n.js'; // opt-in Spanish UI (?lang=es, or an es browser); a no-op otherwise
 import { TOKENS, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, WORKLINES, APPROVAL_ASKS, APPROVAL_BY_AGENT } from './data.js';
 import { hasScreens, makeScreen } from './screens.js'; // live screens (14 Sep): no-op without window.SCREENS
 import { V1, FILE_GEN, STATS, KPIS, P, rnd, ri, person, money } from './v1data.js';
